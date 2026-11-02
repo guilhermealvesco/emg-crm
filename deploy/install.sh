@@ -23,7 +23,7 @@ echo ">> Subindo containers..."
 docker compose up -d --build
 echo ">> Aguardando o app..."
 for i in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:8010/health >/dev/null 2>&1; then break; fi
+  if curl -fsS http://127.0.0.1:8019/health >/dev/null 2>&1; then break; fi
   sleep 2
 done
 echo ">> Criando tabelas e usuários iniciais..."
