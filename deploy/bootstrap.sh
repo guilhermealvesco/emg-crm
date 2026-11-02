@@ -9,11 +9,12 @@ DIR=/root/emg-crm
 echo ">> Pacotes base"
 apt-get update -qq && apt-get install -y -qq git curl openssl ca-certificates >/dev/null
 
-echo ">> Chave de deploy (somente leitura no repositório)"
-mkdir -p /root/.ssh && chmod 700 /root/.ssh
-echo "$DEPLOY_KEY_B64" | base64 -d > /root/.ssh/emg_crm_deploy && chmod 600 /root/.ssh/emg_crm_deploy
-touch /root/.ssh/config && chmod 600 /root/.ssh/config
-if ! grep -q "Host github.com-emg" /root/.ssh/config; then
+if [ -n "${DEPLOY_KEY_B64:-}" ]; then
+  echo ">> Chave de deploy (somente leitura no repositório)"
+  mkdir -p /root/.ssh && chmod 700 /root/.ssh
+  echo "$DEPLOY_KEY_B64" | base64 -d > /root/.ssh/emg_crm_deploy && chmod 600 /root/.ssh/emg_crm_deploy
+  touch /root/.ssh/config && chmod 600 /root/.ssh/config
+  if ! grep -q "Host github.com-emg" /root/.ssh/config; then
 cat >> /root/.ssh/config <<CFG
 Host github.com-emg
   HostName github.com
@@ -22,10 +23,12 @@ Host github.com-emg
   IdentitiesOnly yes
   StrictHostKeyChecking accept-new
 CFG
+  fi
+  REPO="${REPO/github.com/github.com-emg}"
 fi
 
 echo ">> Código"
-if [ -d "$DIR/.git" ]; then git -C "$DIR" pull --ff-only; else git clone "${REPO/github.com/github.com-emg}" "$DIR"; fi
+if [ -d "$DIR/.git" ]; then git -C "$DIR" pull --ff-only; else git clone "$REPO" "$DIR"; fi
 cd "$DIR"
 
 echo ">> Docker"
