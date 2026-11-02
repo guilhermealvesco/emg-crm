@@ -39,6 +39,7 @@ services:
       - "443:443"
     environment:
       CRM_DOMAIN: ${CRM_DOMAIN:-:80}
+      CRM_IP: ${CRM_IP:-179.197.67.43}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

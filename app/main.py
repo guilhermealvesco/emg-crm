@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, session_cookie="emg_session",
-                   max_age=60 * 60 * 24 * 30, same_site="lax", https_only=settings.PUBLIC_URL.startswith("https"))
+                   max_age=60 * 60 * 24 * 30, same_site="lax")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")), name="static")
 
 for r in (auth, dashboard, leads, bancos, tarefas, contratos, liberacoes, admin, webhooks):
