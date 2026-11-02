@@ -256,6 +256,7 @@ class Contract(Base):
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     # qualificação do cliente (editável pelo captador)
     razao_social: Mapped[str] = mapped_column(String(255))
+    nome_fantasia: Mapped[str | None] = mapped_column(String(255))
     cnpj: Mapped[str] = mapped_column(String(20))
     ie_rg: Mapped[str | None] = mapped_column(String(40))
     endereco: Mapped[str | None] = mapped_column(String(255))

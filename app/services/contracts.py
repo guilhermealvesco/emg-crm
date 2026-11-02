@@ -42,7 +42,8 @@ def criar_rascunho(db: Session, lead: Lead, user: User, dados: dict) -> Contract
         raise ContractError("Informe a razão social do cliente.")
     c = Contract(
         lead_id=lead.id, created_by_id=user.id,
-        razao_social=razao, cnpj=fmt_cnpj(dados.get("cnpj") or lead.cnpj),
+        razao_social=razao, nome_fantasia=(dados.get("nome_fantasia") or "").strip() or None,
+        cnpj=fmt_cnpj(dados.get("cnpj") or lead.cnpj),
         ie_rg=dados.get("ie_rg") or None, endereco=dados.get("endereco") or None, cep=dados.get("cep") or None,
         cidade_uf=dados.get("cidade_uf") or None, telefone=dados.get("telefone") or None,
         email=dados["email"].strip(), representante=dados.get("representante", "").strip(),

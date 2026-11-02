@@ -20,8 +20,9 @@ from ..utils import fmt_cnpj, parse_brl
 
 router = APIRouter(prefix="/contratos")
 
-FORMAS = ["PIX à vista (CNPJ 60.975.099/0001-79, Banco Bradesco PJ)",
-          "Boleto à vista", "Cartão de crédito em até 12x com juros", "3 parcelas (PIX/boleto)"]
+FORMAS = ["transferência PIX à vista para a conta da CONTRATADA (CNPJ 60.975.099/0001-79, Banco Bradesco PJ)",
+          "boleto bancário à vista", "cartão de crédito em até 12 (doze) parcelas, com os encargos da operadora",
+          "transferência PIX em 3 (três) parcelas mensais iguais"]
 
 
 def _contract(db: Session, cid: int, user: User) -> Contract:
@@ -54,7 +55,7 @@ def novo(request: Request, lead_id: int, user: User = Depends(get_current_user),
         f"{raw.get('descricao_tipo_de_logradouro', '')} {raw.get('logradouro', '')}".strip(),
         raw.get("numero"), raw.get("complemento"), raw.get("bairro")] if x) or ""
     sugestao = {
-        "razao_social": lead.razao_social or lead.nome, "cnpj": fmt_cnpj(lead.cnpj),
+        "razao_social": lead.razao_social or lead.nome, "nome_fantasia": lead.nome_fantasia or "", "cnpj": fmt_cnpj(lead.cnpj),
         "endereco": endereco, "cep": raw.get("cep", ""),
         "cidade_uf": f"{cad.get('municipio', '')}/{cad.get('uf', '')}" if cad.get("municipio") else "",
         "telefone": lead.contato_telefone or "", "email": lead.contato_email or "",
@@ -71,7 +72,7 @@ async def criar(request: Request, lead_id: int, user: User = Depends(get_current
     if not lead or not pode_ver(lead, user):
         raise HTTPException(404)
     form = await request.form()
-    dados = {k: (form.get(k) or "").strip() for k in ("razao_social", "cnpj", "ie_rg", "endereco", "cep", "cidade_uf",
+    dados = {k: (form.get(k) or "").strip() for k in ("razao_social", "nome_fantasia", "cnpj", "ie_rg", "endereco", "cep", "cidade_uf",
                                                       "telefone", "email", "representante", "representante_cpf")}
     dados["tarifa_valor"] = parse_brl(form.get("tarifa_valor"))
     forma = (form.get("forma_pagamento") or "").strip()

@@ -2,14 +2,14 @@
 {% block title %}Gerar contrato · EMG CRM{% endblock %}
 {% block content %}
 <h1>Gerar contrato</h1>
-<p class="muted">Contrato padrão da EMG. Você edita apenas a qualificação do cliente, a tarifa e a forma de pagamento. As demais cláusulas são fixas.</p>
+<p class="muted">Contrato padrão da EMG (consultoria para estruturação e captação de crédito, 9 cláusulas, êxito 15% até R$ 500 mil + 10% no excedente). Você edita apenas a qualificação do cliente, a tarifa e a forma de pagamento.</p>
 <form method="post" action="/contratos/novo/{{ lead.id }}" class="grid g2" style="align-items:start">
   <div class="card stack">
     <h2>Qualificação do cliente</h2>
     <div class="field"><label>Razão social *</label><input name="razao_social" value="{{ s.razao_social }}" required></div>
+    <div class="field"><label>Nome fantasia</label><input name="nome_fantasia" value="{{ s.nome_fantasia }}"></div>
     <div class="field"><label>CNPJ *</label><input name="cnpj" value="{{ s.cnpj }}" data-mask="cnpj" required></div>
-    <div class="field"><label>Inscrição estadual / RG</label><input name="ie_rg"></div>
-    <div class="field"><label>Endereço completo</label><input name="endereco" value="{{ s.endereco }}"></div>
+        <div class="field"><label>Endereço completo</label><input name="endereco" value="{{ s.endereco }}"></div>
     <div class="row"><div class="field" style="flex:1"><label>CEP</label><input name="cep" value="{{ s.cep }}"></div><div class="field" style="flex:1"><label>Cidade/UF</label><input name="cidade_uf" value="{{ s.cidade_uf }}"></div></div>
     <div class="field"><label>Telefone</label><input name="telefone" value="{{ s.telefone }}"></div>
     <div class="field"><label>Representante legal *</label><input name="representante" value="{{ s.representante }}" required></div>

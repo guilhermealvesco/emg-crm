@@ -169,13 +169,13 @@ def test_fluxo_completo(client):
     r = client.post(f"/contratos/novo/{lead_id}", data={"razao_social": "Padaria do João LTDA", "cnpj": "11.222.333/0001-81",
                                                         "endereco": "Rua A, 10", "cidade_uf": "Recife/PE", "email": "joao@padaria.com",
                                                         "representante": "João Silva", "representante_cpf": "529.982.247-25",
-                                                        "tarifa_valor": "4.000", "forma_pagamento": "PIX à vista (CNPJ 60.975.099/0001-79, Banco Bradesco PJ)"},
+                                                        "tarifa_valor": "4.000", "forma_pagamento": "boleto bancário à vista"},
                     follow_redirects=False)
     assert r.headers["location"].startswith("/contratos/novo")  # abaixo do piso, recusa
     r = client.post(f"/contratos/novo/{lead_id}", data={"razao_social": "Padaria do João LTDA", "cnpj": "11.222.333/0001-81",
                                                         "endereco": "Rua A, 10", "cidade_uf": "Recife/PE", "email": "joao@padaria.com",
                                                         "representante": "João Silva", "representante_cpf": "529.982.247-25",
-                                                        "tarifa_valor": "6.000,00", "forma_pagamento": "outra", "forma_pagamento_outra": "PIX em 2x"},
+                                                        "nome_fantasia": "Padaria do João", "tarifa_valor": "6.000,00", "forma_pagamento": "outra", "forma_pagamento_outra": "PIX em 2 (duas) parcelas"},
                     follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith("/contratos/")
     cid = int(r.headers["location"].rsplit("/", 1)[1])
