@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Tarefas · EMG CRM{% endblock %}
+{% block content %}
+<div class="row between"><h1>Tarefas</h1>
+  <div class="row">
+    <a class="btn sm {{ 'ghost' if feitas else '' }}" href="/tarefas?todas={{ todas }}">Abertas</a>
+    <a class="btn sm {{ '' if feitas else 'ghost' }}" href="/tarefas?todas={{ todas }}&feitas=1">Concluídas</a>
+    {% if user.is_staff %}<a class="btn sm ghost" href="/tarefas?todas={{ 0 if todas else 1 }}&feitas={{ feitas }}">{{ 'Só as minhas' if todas else 'De todos' }}</a>{% endif %}
+  </div>
+</div>
+<div class="card">
+  <div class="list">
+    {% for t in tarefas %}
+    <div class="item row between">
+      <div>
+        <div class="t">{{ t.titulo }}</div>
+        <div class="small muted">{{ TaskType.LABELS.get(t.tipo, t.tipo) }}{% if t.lead %} · <a href="/leads/{{ t.lead.id }}">{{ t.lead.nome }}</a>{% endif %}
+          {% if todas %} · {{ t.assigned_to.name }}{% endif %}
+          {% if t.due_date %} · {% if t.atrasada %}<span class="badge b-bad">atrasada {{ t.due_date|date }}</span>{% else %}vence {{ t.due_date|date }}{% endif %}{% endif %}
+          {% if t.auto %} · <span class="tiny">automática</span>{% endif %}{% if t.done %} · concluída {{ t.done_at|dt }}{% endif %}</div>
+        {% if t.descricao %}<div class="small">{{ t.descricao }}</div>{% endif %}
+      </div>
+      {% if not t.done %}
+      <form method="post" action="/tarefas/{{ t.id }}/concluir" class="row"><input name="nota" placeholder="nota (opcional)" style="width:180px"><button class="btn sm ok">Concluir</button></form>
+      {% endif %}
+    </div>
+    {% else %}<p class="muted">Nenhuma tarefa.</p>{% endfor %}
+  </div>
+</div>
+<div class="card" style="margin-top:14px">
+  <h3>Nova tarefa</h3>
+  <form method="post" action="/tarefas/nova" class="row">
+    <input name="titulo" required placeholder="o que precisa ser feito" style="flex:2;min-width:200px">
+    <select name="tipo" style="flex:1">{% for k, l in TaskType.LABELS.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+    <input type="date" name="due_date" value="{{ hoje }}" style="flex:1;min-width:140px">
+    {% if user.is_staff %}<select name="assigned_to_id" style="flex:1"><option value="">para mim</option>{% for u in usuarios %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select>{% endif %}
+    <button class="btn">Criar</button>
+  </form>
+</div>
+{% endblock %}

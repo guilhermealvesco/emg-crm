@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Ranking · EMG CRM{% endblock %}
+{% block content %}
+<div class="row between"><h1>Ranking dos captadores</h1>
+<form method="get" class="row"><input type="date" name="inicio" value="{{ inicio }}" style="width:160px"><input type="date" name="fim" value="{{ fim }}" style="width:160px"><button class="btn sm ghost" type="submit">Filtrar</button></form></div>
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="kpi"><div class="v">{{ resumo.total_leads }}</div><div class="l">Leads no total</div></div>
+  <div class="kpi"><div class="v">{{ resumo.volume_liberado|brl }}</div><div class="l">Volume liberado</div></div>
+  <div class="kpi"><div class="v">{{ resumo.comissao_paga|brl }}</div><div class="l">Comissões pagas</div></div>
+  <div class="kpi"><div class="v">{{ resumo.comissao_pendente|brl }}</div><div class="l">Comissões a pagar</div></div>
+</div>
+<div class="card"><div class="tbl-wrap"><table>
+  <tr><th>#</th><th>Captador</th><th class="num">Leads</th><th class="num">Triados</th><th class="num">Aprovados</th><th class="num">Aproveit.</th><th class="num">Contratos</th><th class="num">Liberações</th><th class="num">Volume liberado</th><th class="num">Comissão total</th><th class="num">Paga</th><th class="num">A pagar</th></tr>
+  {% for r in ranking %}
+  <tr><td><b>{{ r.posicao }}</b></td><td>{{ r.captador.name }}<div class="tiny muted">{{ r.leads_ativos }} ativos</div></td>
+    <td class="num">{{ r.leads }}</td><td class="num">{{ r.triados }}</td><td class="num">{{ r.aprovados }}</td><td class="num">{{ r.aproveitamento|pct }}</td>
+    <td class="num">{{ r.contratos }}</td><td class="num">{{ r.liberacoes }}</td><td class="num"><b>{{ r.volume|brl }}</b></td>
+    <td class="num">{{ r.comissao_total|brl }}</td><td class="num">{{ r.comissao_paga|brl }}</td><td class="num">{{ r.comissao_pendente|brl }}</td></tr>
+  {% endfor %}
+</table></div>
+<p class="tiny muted">Ordem: volume liberado, depois contratos assinados, aprovados e leads. Base para premiação.</p></div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ codigo }} · EMG CRM{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
+  <h1>{{ codigo }}</h1>
+  <p class="muted">{{ detalhe or "Página não encontrada." }}</p>
+  <a class="btn ghost" href="/">Voltar ao início</a>
+</div>
+{% endblock %}

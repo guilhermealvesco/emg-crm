@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Início · EMG CRM{% endblock %}
+{% block content %}
+<div class="row between">
+  <div><h1>Olá, {{ user.name.split(' ')[0] }}</h1><p class="muted" style="margin-top:-6px">{{ hoje|date }} · {{ Role.LABELS[user.role] }}</p></div>
+  <a class="btn" href="/leads/novo">＋ Novo lead</a>
+</div>
+
+<div class="funnel" style="margin:14px 0 18px">
+  {% for s in Stage.ORDER %}
+  <a class="st {{ 'on' if etapas.get(s) }}" href="/leads?etapa={{ s }}" style="text-decoration:none"><div class="n">{{ etapas.get(s, 0) }}</div><div class="t">{{ Stage.LABELS[s] }}</div></a>
+  {% endfor %}
+</div>
+
+{% if user.is_staff %}
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="kpi"><div class="v">{{ triagem_pendente }}</div><div class="l">Aguardando triagem</div></div>
+  <div class="kpi"><div class="v">{{ fila_bancos }}</div><div class="l">Leads com banco por enviar</div></div>
+  <div class="kpi"><div class="v">{{ resumo.volume_liberado|brl }}</div><div class="l">Volume liberado</div></div>
+  <div class="kpi"><div class="v">{{ resumo.comissao_pendente|brl }}</div><div class="l">Comissões a pagar</div></div>
+</div>
+{% elif minha_posicao %}
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="kpi"><div class="v">{{ minha_posicao.posicao }}º</div><div class="l">Posição no ranking</div></div>
+  <div class="kpi"><div class="v">{{ minha_posicao.leads_ativos }}</div><div class="l">Leads ativos</div></div>
+  <div class="kpi"><div class="v">{{ minha_posicao.volume|brl }}</div><div class="l">Volume liberado</div></div>
+  <div class="kpi"><div class="v">{{ minha_posicao.comissao_pendente|brl }}</div><div class="l">Comissão a receber</div></div>
+</div>
+{% endif %}
+
+<div class="grid g2">
+  <div class="card">
+    <div class="row between"><h2>Minhas tarefas</h2><a class="small" href="/tarefas">ver todas</a></div>
+    {% if not tarefas %}<p class="muted">Nenhuma tarefa aberta.</p>{% endif %}
+    <div class="list">
+      {% for t in tarefas %}
+      <div class="item">
+        <div class="row between">
+          <div>
+            <div class="t">{{ t.titulo }}</div>
+            <div class="small muted">{{ TaskType.LABELS.get(t.tipo, t.tipo) }}{% if t.lead %} · <a href="/leads/{{ t.lead.id }}">{{ t.lead.nome }}</a>{% endif %}
+              {% if t.due_date %} · {% if t.atrasada %}<span class="badge b-bad">atrasada {{ t.due_date|date }}</span>{% else %}vence {{ t.due_date|date }}{% endif %}{% endif %}</div>
+          </div>
+          <form method="post" action="/tarefas/{{ t.id }}/concluir"><input type="hidden" name="voltar" value="/"><button class="btn sm ok" type="submit">Concluir</button></form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row between"><h2>Alertas</h2><a class="small" href="/alertas">ver todos</a></div>
+    {% if not com_alerta %}<p class="muted">Tudo em dia.</p>{% endif %}
+    <div class="list alerts">
+      {% for lead, als in com_alerta %}
+      <div class="item {{ 'alto' if als|selectattr('nivel','equalto','alto')|list }}">
+        <div class="t"><a href="/leads/{{ lead.id }}">{{ lead.nome }}</a> <span class="stage-pill {{ lead.stage }}">{{ lead.stage_label }}</span></div>
+        <div class="small muted">{% for a in als %}{{ a.texto }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="grid g2" style="margin-top:16px">
+  <div class="card">
+    <div class="row between"><h2>Leads recentes</h2><a class="small" href="/leads">ver todos</a></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Empresa</th><th>Etapa</th><th>Pré-score</th>{% if user.is_staff %}<th>Captador</th>{% endif %}<th>Atualizado</th></tr>
+      {% for l in leads %}
+      <tr><td><a href="/leads/{{ l.id }}">{{ l.nome }}</a><div class="tiny muted">{{ l.cnpj|cnpj }}</div></td>
+        <td><span class="stage-pill {{ l.stage }}">{{ l.stage_label }}</span></td>
+        <td><span class="dot {{ l.prescore }}"></span>{{ l.prescore_label }}</td>
+        {% if user.is_staff %}<td>{{ l.captador.name.split(' ')[0] }}</td>{% endif %}
+        <td class="small muted">{{ l.last_activity_at|dt }}</td></tr>
+      {% endfor %}
+    </table></div>
+  </div>
+  {% if user.is_staff %}
+  <div class="card">
+    <div class="row between"><h2>Ranking</h2><a class="small" href="/ranking">completo</a></div>
+    <table>
+      <tr><th>#</th><th>Captador</th><th class="num">Leads</th><th class="num">Contratos</th><th class="num">Volume</th></tr>
+      {% for r in ranking %}
+      <tr><td>{{ r.posicao }}</td><td>{{ r.captador.name }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.contratos }}</td><td class="num">{{ r.volume|brl }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

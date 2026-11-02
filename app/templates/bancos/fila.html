@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Fila dos bancos · EMG CRM{% endblock %}
+{% block content %}
+<h1>Fila dos bancos</h1>
+<p class="muted">Toque no banco para marcar. Para valor estimado e observação, use "detalhar" ou abra o lead.</p>
+
+<h2>Falta enviar ({{ pendentes|length }})</h2>
+{% if not pendentes %}<p class="muted">Nenhum lead com banco pendente de envio.</p>{% endif %}
+<div class="list">
+  {% for lead, faltam, dias in pendentes %}
+  <div class="card">
+    <div class="row between"><div><a href="/leads/{{ lead.id }}"><b>{{ lead.nome }}</b></a> <span class="tiny muted">{{ lead.cnpj|cnpj }} · {{ lead.captador.name.split(' ')[0] }}</span>
+      {% if lead.valor_pretendido %}<span class="small gold"> · pretende {{ lead.valor_pretendido|brl }}</span>{% endif %}</div>
+      <span class="badge {{ 'b-bad' if dias >= 5 else ('b-warn' if dias >= 3 else 'b-grey') }}">{{ dias }} dia(s) na etapa</span></div>
+    <div class="bank-grid" style="margin-top:10px">
+      {% for b in lead.banks %}
+      <div class="bank {{ b.status }}">
+        <div class="n">{{ b.banco }}</div><div class="tiny muted">{{ b.status_label }}</div>
+        <div class="quick">
+          {% if b.status == BankStatus.NAO_ENVIADO %}
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}/rapido"><input type="hidden" name="status" value="enviado"><button class="btn info">Enviado</button></form>
+          {% elif b.status == BankStatus.ENVIADO %}
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}/rapido"><input type="hidden" name="status" value="retorno_bom"><button class="btn ok">Bom</button></form>
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}/rapido"><input type="hidden" name="status" value="retorno_ruim"><button class="btn bad">Ruim</button></form>
+          {% endif %}
+        </div>
+        <details><summary class="tiny">detalhar</summary>
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}" class="stack" style="text-align:left">
+            <input type="hidden" name="voltar" value="/bancos">
+            <select name="status">{% for s, l in BankStatus.LABELS.items() %}<option value="{{ s }}" {{ 'selected' if b.status == s }}>{{ l }}</option>{% endfor %}</select>
+            <input name="valor_estimado" inputmode="decimal" placeholder="valor estimado R$" value="{{ b.valor_estimado or '' }}">
+            <input name="gerente" placeholder="gerente" value="{{ b.gerente or '' }}">
+            <textarea name="observacao" placeholder="retorno" style="min-height:56px">{{ b.observacao or '' }}</textarea>
+            <button class="btn sm block">Salvar</button>
+          </form></details>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<h2 style="margin-top:22px">Aguardando retorno ({{ aguardando|length }})</h2>
+<div class="list">
+  {% for lead, enviados, dias in aguardando %}
+  <div class="card">
+    <div class="row between"><div><a href="/leads/{{ lead.id }}"><b>{{ lead.nome }}</b></a> <span class="tiny muted">{{ lead.captador.name.split(' ')[0] }}</span></div><span class="badge b-grey">{{ dias }} dia(s)</span></div>
+    <div class="bank-grid" style="margin-top:10px">
+      {% for b in lead.banks %}
+      <div class="bank {{ b.status }}"><div class="n">{{ b.banco }}</div><div class="tiny muted">{{ b.status_label }}</div>
+        {% if b.valor_estimado %}<div class="small gold">{{ b.valor_estimado|brl }}</div>{% endif %}
+        {% if b.status == BankStatus.ENVIADO %}<div class="quick">
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}/rapido"><input type="hidden" name="status" value="retorno_bom"><button class="btn ok">Bom</button></form>
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}/rapido"><input type="hidden" name="status" value="retorno_ruim"><button class="btn bad">Ruim</button></form></div>{% endif %}
+        <details><summary class="tiny">detalhar</summary>
+          <form method="post" action="/bancos/{{ lead.id }}/{{ b.banco }}" class="stack" style="text-align:left"><input type="hidden" name="voltar" value="/bancos">
+            <select name="status">{% for s, l in BankStatus.LABELS.items() %}<option value="{{ s }}" {{ 'selected' if b.status == s }}>{{ l }}</option>{% endfor %}</select>
+            <input name="valor_estimado" inputmode="decimal" placeholder="valor estimado R$" value="{{ b.valor_estimado or '' }}">
+            <textarea name="observacao" placeholder="retorno" style="min-height:56px">{{ b.observacao or '' }}</textarea>
+            <button class="btn sm block">Salvar</button></form></details>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}<p class="muted">Nada aguardando.</p>{% endfor %}
+</div>
+
+{% if concluidos %}
+<h2 style="margin-top:22px">Com todos os retornos ({{ concluidos|length }})</h2>
+<div class="card"><table><tr><th>Empresa</th><th>Etapa</th><th>Bancos</th></tr>
+{% for l in concluidos %}<tr><td><a href="/leads/{{ l.id }}">{{ l.nome }}</a></td><td><span class="stage-pill {{ l.stage }}">{{ l.stage_label }}</span></td>
+<td>{% for b in l.banks %}<span class="badge {{ 'b-ok' if b.status == 'retorno_bom' else 'b-bad' }}">{{ b.banco }}</span> {% endfor %}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

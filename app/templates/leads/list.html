@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Leads · EMG CRM{% endblock %}
+{% block content %}
+<div class="row between"><h1>Leads</h1><a class="btn" href="/leads/novo">＋ Novo lead</a></div>
+<form method="get" class="card flat row" style="margin-bottom:14px">
+  <input type="search" name="q" value="{{ q }}" placeholder="Buscar por empresa, CNPJ ou contato" style="flex:2;min-width:200px">
+  <select name="etapa" style="flex:1;min-width:150px"><option value="">Todas as etapas</option>
+    {% for s, l in Stage.LABELS.items() %}<option value="{{ s }}" {{ 'selected' if etapa == s }}>{{ l }}</option>{% endfor %}</select>
+  <select name="prescore" style="flex:1;min-width:140px"><option value="">Pré-score</option>
+    {% for s, l in Prescore.LABELS.items() %}<option value="{{ s }}" {{ 'selected' if prescore == s }}>{{ l }}</option>{% endfor %}</select>
+  {% if user.is_staff %}<select name="captador" style="flex:1;min-width:150px"><option value="">Todos os captadores</option>
+    {% for c in captadores %}<option value="{{ c.id }}" {{ 'selected' if captador == c.id }}>{{ c.name }}</option>{% endfor %}</select>{% endif %}
+  <button class="btn ghost" type="submit">Filtrar</button>
+</form>
+<div class="card"><div class="tbl-wrap"><table>
+  <tr><th>Empresa</th><th>Etapa</th><th>Pré-score</th><th>Contato</th>{% if user.is_staff %}<th>Captador</th>{% endif %}<th>Posse até</th><th>Alertas</th><th>Atualizado</th></tr>
+  {% for l in leads %}
+  <tr>
+    <td><a href="/leads/{{ l.id }}"><b>{{ l.nome }}</b></a><div class="tiny muted">{{ l.cnpj|cnpj }}{% if l.origem %} · {{ l.origem }}{% endif %}</div></td>
+    <td><span class="stage-pill {{ l.stage }}">{{ l.stage_label }}</span></td>
+    <td><span class="dot {{ l.prescore }}"></span>{{ l.prescore_label }}{% if l.prescore_pontos is not none %} <span class="tiny muted">{{ l.prescore_pontos }}</span>{% endif %}</td>
+    <td class="small">{{ l.contato_nome or '' }}<div class="tiny muted">{{ l.contato_telefone or '' }}</div></td>
+    {% if user.is_staff %}<td class="small">{{ l.captador.name.split(' ')[0] }}</td>{% endif %}
+    <td class="small muted">{{ l.owner_until|date }}</td>
+    <td>{% for a in alertas[l.id] %}<span class="badge {{ 'b-bad' if a.nivel == 'alto' else 'b-warn' }}" title="{{ a.texto }}">{{ a.tipo }}</span> {% endfor %}</td>
+    <td class="small muted">{{ l.last_activity_at|dt }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" class="muted">Nenhum lead encontrado.</td></tr>
+  {% endfor %}
+</table></div></div>
+{% endblock %}

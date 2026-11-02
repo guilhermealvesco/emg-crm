@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Minha senha · EMG CRM{% endblock %}
+{% block content %}
+<h1>Minha conta</h1>
+<div class="card" style="max-width:480px">
+  <p class="muted">{{ user.name }} · {{ user.email }} · {{ Role.LABELS[user.role] }}</p>
+  <form method="post" action="/senha">
+    <div class="field"><label>Senha atual</label><input type="password" name="atual" required></div>
+    <div class="field"><label>Nova senha</label><input type="password" name="nova" required minlength="8"></div>
+    <div class="field"><label>Confirmar nova senha</label><input type="password" name="confirma" required minlength="8"></div>
+    <button class="btn" type="submit">Alterar senha</button>
+  </form>
+</div>
+{% endblock %}

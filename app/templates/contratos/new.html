@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Gerar contrato · EMG CRM{% endblock %}
+{% block content %}
+<h1>Gerar contrato</h1>
+<p class="muted">Contrato padrão da EMG. Você edita apenas a qualificação do cliente, a tarifa e a forma de pagamento. As demais cláusulas são fixas.</p>
+<form method="post" action="/contratos/novo/{{ lead.id }}" class="grid g2" style="align-items:start">
+  <div class="card stack">
+    <h2>Qualificação do cliente</h2>
+    <div class="field"><label>Razão social *</label><input name="razao_social" value="{{ s.razao_social }}" required></div>
+    <div class="field"><label>CNPJ *</label><input name="cnpj" value="{{ s.cnpj }}" data-mask="cnpj" required></div>
+    <div class="field"><label>Inscrição estadual / RG</label><input name="ie_rg"></div>
+    <div class="field"><label>Endereço completo</label><input name="endereco" value="{{ s.endereco }}"></div>
+    <div class="row"><div class="field" style="flex:1"><label>CEP</label><input name="cep" value="{{ s.cep }}"></div><div class="field" style="flex:1"><label>Cidade/UF</label><input name="cidade_uf" value="{{ s.cidade_uf }}"></div></div>
+    <div class="field"><label>Telefone</label><input name="telefone" value="{{ s.telefone }}"></div>
+    <div class="field"><label>Representante legal *</label><input name="representante" value="{{ s.representante }}" required></div>
+    <div class="field"><label>CPF do representante *</label><input name="representante_cpf" value="{{ s.representante_cpf|cpf }}" data-mask="cpf" required></div>
+    <div class="field"><label>E-mail do signatário * (recebe o link do Autentique)</label><input name="email" type="email" value="{{ s.email }}" required></div>
+  </div>
+  <div class="card stack">
+    <h2>Condições</h2>
+    <div class="field"><label>Tarifa de estruturação (R$) *</label><input name="tarifa_valor" value="{{ '%.2f'|format(s.tarifa_valor) }}" inputmode="decimal" required>
+      <p class="tiny muted">Tabela {{ tabela|brl }}. Piso {{ piso|brl }} líquidos para a EMG. O que exceder o piso é 100% do captador.</p></div>
+    <div class="field"><label>Forma de pagamento *</label>
+      <select name="forma_pagamento" id="forma_pagamento">{% for f in formas %}<option>{{ f }}</option>{% endfor %}<option value="outra">Outra (descrever)</option></select>
+      <input name="forma_pagamento_outra" id="forma-outra" placeholder="descreva a forma de pagamento" style="margin-top:8px;display:none"></div>
+    <p class="small muted">Assinatura eletrônica com documento + selfie + prova de vida pelo Autentique. O arquivo será nomeado <b>{{ s.razao_social }}-Contrato-Consultoria-Credito.pdf</b> (sem acentos/espaços).</p>
+    <button class="btn block" type="submit">Gerar PDF do contrato</button>
+    <a class="btn ghost block" href="/leads/{{ lead.id }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

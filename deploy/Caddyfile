@@ -1,0 +1,6 @@
+# Se CRM_DOMAIN for um domínio (ex.: crm.emfinanceira.com), o Caddy emite o certificado HTTPS sozinho.
+# Se for ":80", serve só HTTP (uso interno/teste; o webhook do Autentique exige HTTPS).
+{$CRM_DOMAIN} {
+    encode gzip
+    reverse_proxy app:8000
+}

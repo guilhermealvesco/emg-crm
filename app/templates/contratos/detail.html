@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Contrato · EMG CRM{% endblock %}
+{% block content %}
+<div class="row between" style="align-items:flex-start">
+  <div><h1>{{ c.file_basename }}.pdf</h1>
+    <div class="muted">Cliente <a href="/leads/{{ c.lead_id }}">{{ c.razao_social }}</a> · {{ c.cnpj }} · signatário {{ c.representante }} ({{ c.email }})</div></div>
+  <span class="badge {{ 'b-ok' if c.status == 'assinado' else ('b-info' if c.status == 'enviado' else ('b-bad' if c.status in ('recusado','cancelado') else 'b-grey')) }}" style="font-size:14px">{{ c.status_label }}</span>
+</div>
+<div class="grid g2" style="margin-top:14px;align-items:start">
+  <div class="card stack">
+    <h2>Documento</h2>
+    <table class="small">
+      <tr><td class="muted">Tarifa</td><td>{{ c.tarifa_valor|brl }}</td></tr>
+      <tr><td class="muted">Forma de pagamento</td><td>{{ c.forma_pagamento }}</td></tr>
+      <tr><td class="muted">Gerado</td><td>{{ c.created_at|dt }} por {{ c.created_by.name }}</td></tr>
+      <tr><td class="muted">Enviado</td><td>{{ c.sent_at|dt or '-' }}{% if c.sandbox %} <span class="badge b-grey">sandbox</span>{% endif %}</td></tr>
+      <tr><td class="muted">Assinado</td><td>{{ c.signed_at|dt or '-' }}</td></tr>
+      {% if c.autentique_id %}<tr><td class="muted">Autentique</td><td class="mono tiny">{{ c.autentique_id }}</td></tr>{% endif %}
+      {% if c.autentique_link %}<tr><td class="muted">Link de assinatura</td><td><a href="{{ c.autentique_link }}" target="_blank">{{ c.autentique_link }}</a></td></tr>{% endif %}
+    </table>
+    {% if c.error %}<p class="small" style="color:#F0A0A0">{{ c.error }}</p>{% endif %}
+    <div class="row">
+      <a class="btn ghost" href="/contratos/{{ c.id }}/pdf" target="_blank">Abrir PDF</a>
+      {% if c.signed_pdf_path %}<a class="btn ok" href="/contratos/{{ c.id }}/pdf?assinado=1" target="_blank">PDF assinado</a>{% endif %}
+    </div>
+  </div>
+  <div class="card stack">
+    <h2>Ações</h2>
+    {% if c.status in ('rascunho','recusado') %}
+    <p class="small muted">Confira o PDF antes de enviar. O cliente recebe o e-mail do Autentique e assina com documento + selfie.{% if settings.AUTENTIQUE_SANDBOX %} <b>Modo sandbox ativo:</b> o envio é de teste e não consome créditos.{% endif %}</p>
+    <form method="post" action="/contratos/{{ c.id }}/enviar"><button class="btn block" type="submit">Enviar para assinatura (Autentique)</button></form>
+    {% endif %}
+    {% if c.status == 'enviado' %}
+    <form method="post" action="/contratos/{{ c.id }}/sincronizar"><button class="btn ghost block" type="submit">Verificar status no Autentique</button></form>
+    <p class="tiny muted">Quando o cliente assinar, o webhook arquiva o PDF assinado e o lead avança para "Docs". Use o botão acima se precisar conferir na hora.</p>
+    {% endif %}
+    {% if c.status != 'assinado' and c.status != 'cancelado' %}
+    <form method="post" action="/contratos/{{ c.id }}/cancelar" data-confirm="Cancelar este contrato?"><button class="btn danger block" type="submit">Cancelar contrato</button></form>
+    {% endif %}
+    {% if c.status == 'assinado' %}
+    <p class="small">Contrato assinado. Próximo passo: coletar a documentação do cliente (tarefa criada para o captador) e confirmar a tarifa na página do lead.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

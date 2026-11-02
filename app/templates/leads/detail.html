@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.nome }} · EMG CRM{% endblock %}
+{% block content %}
+{% set cad = (lead.enrichment or {}).get('cadastral') or {} %}
+{% set bureau = (lead.enrichment or {}).get('bureau') or {} %}
+{% if not lead.enrichment_at %}<div class="flash ok" data-refresh="6000">Consultando Receita Federal e bureaus... esta página recarrega sozinha.</div>{% endif %}
+
+<div class="row between" style="align-items:flex-start">
+  <div>
+    <h1 style="margin-bottom:2px">{{ lead.nome }}</h1>
+    <div class="muted">{{ lead.cnpj|cnpj }}{% if lead.razao_social and lead.nome_fantasia %} · {{ lead.razao_social }}{% endif %}</div>
+    <div class="row" style="margin-top:8px">
+      <span class="stage-pill {{ lead.stage }}">{{ lead.stage_label }}</span>
+      <span class="score {{ lead.prescore }}"><span class="dot {{ lead.prescore }}"></span>{{ lead.prescore_label }}{% if lead.prescore_pontos is not none %} · {{ lead.prescore_pontos }} pts{% endif %}</span>
+      {% if lead.triagem_decisao %}<span class="badge {{ 'b-ok' if lead.triagem_decisao == 'aprovado' else 'b-bad' }}">Triagem: {{ lead.triagem_decisao }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="right small muted">
+    Captador: <b style="color:var(--off)">{{ lead.captador.name }}</b><br>
+    Posse até {{ lead.owner_until|date }}{% if lead.origem %} · {{ lead.origem }}{% endif %}<br>
+    Registrado em {{ lead.created_at|dt }}
+  </div>
+</div>
+
+{% if alertas %}
+<div class="list alerts" style="margin:12px 0">
+  {% for a in alertas %}<div class="item {{ a.nivel }}"><span class="small">{{ a.texto }}</span></div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="grid g2" style="margin-top:14px;align-items:start">
+<div class="stack">
+
+  {# ---------------- Operação / etapa ---------------- #}
+  {% if user.is_staff %}
+  <div class="card">
+    <h2>Operação</h2>
+    {% if lead.stage in ('novo','triagem') and not lead.triagem_decisao %}
+    <form method="post" action="/leads/{{ lead.id }}/triagem" class="stack">
+      <p class="small muted">O pré-score é orientativo. Empresa nova com sócio forte pode passar. A decisão é sua.</p>
+      <div class="field"><label>Observação da triagem</label><input name="obs" placeholder="opcional"></div>
+      <div class="row"><button class="btn ok" name="decisao" value="aprovado">Aprovar e enviar aos bancos</button>
+        <button class="btn bad" name="decisao" value="reprovado" onclick="return confirm('Reprovar este lead?')">Reprovar</button></div>
+    </form>
+    {% else %}
+    <form method="post" action="/leads/{{ lead.id }}/etapa" class="row">
+      <select name="nova" style="flex:1">{% for s in Stage.ORDER + [Stage.PERDIDO] %}<option value="{{ s }}" {{ 'selected' if s == lead.stage }}>{{ Stage.LABELS[s] }}</option>{% endfor %}</select>
+      <input name="obs" placeholder="observação / motivo" style="flex:1">
+      <button class="btn ghost" type="submit">Mudar etapa</button>
+    </form>
+    <p class="tiny muted" style="margin-bottom:0">Trava: cobrança e contrato só depois de retorno bom de um banco. {% if not pode_cobrar %}<b>{{ motivo_cobranca }}</b>{% endif %}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ---------------- Matriz de bancos ---------------- #}
+  <div class="card">
+    <div class="row between"><h2>Matriz de bancos</h2>{% if user.is_staff %}<a class="small" href="/bancos">fila completa</a>{% endif %}</div>
+    {% if lead.triagem_decisao != 'aprovado' %}<p class="muted small">Disponível após aprovação na triagem.</p>{% endif %}
+    <div class="bank-grid">
+      {% for nome in bancos %}{% set b = banks_by_name.get(nome) %}
+      <div class="bank {{ b.status if b else 'nao_enviado' }}">
+        <div class="n">{{ nome }}</div>
+        <div class="tiny muted">{{ b.status_label if b else 'Não enviado' }}</div>
+        {% if b and b.valor_estimado %}<div class="small gold">{{ b.valor_estimado|brl }}</div>{% endif %}
+        {% if b and b.enviado_em %}<div class="tiny muted">env. {{ b.enviado_em|dt(False) }}</div>{% endif %}
+        {% if b and b.observacao %}<div class="tiny" title="{{ b.observacao }}">{{ b.observacao[:60] }}{% if b.observacao|length > 60 %}…{% endif %}</div>{% endif %}
+        {% if user.is_staff and lead.triagem_decisao == 'aprovado' %}
+        <details><summary class="tiny">editar</summary>
+          <form method="post" action="/bancos/{{ lead.id }}/{{ nome }}" class="stack" style="text-align:left">
+            <input type="hidden" name="voltar" value="/leads/{{ lead.id }}">
+            <select name="status">{% for s, l in BankStatus.LABELS.items() %}<option value="{{ s }}" {{ 'selected' if b and b.status == s }}>{{ l }}</option>{% endfor %}</select>
+            <input name="valor_estimado" inputmode="decimal" placeholder="valor estimado R$" value="{{ b.valor_estimado if b and b.valor_estimado else '' }}">
+            <input name="gerente" placeholder="gerente" value="{{ b.gerente if b and b.gerente else '' }}">
+            <textarea name="observacao" placeholder="retorno do gerente" style="min-height:60px">{{ b.observacao if b and b.observacao else '' }}</textarea>
+            <button class="btn sm block" type="submit">Salvar</button>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------------- Contrato e cobrança ---------------- #}
+  <div class="card">
+    <h2>Contrato e tarifa</h2>
+    {% if lead.contracts %}
+    <div class="list">
+      {% for c in lead.contracts %}
+      <div class="item row between"><div><a href="/contratos/{{ c.id }}">{{ c.file_basename }}.pdf</a><div class="tiny muted">{{ c.created_at|dt }} · tarifa {{ c.tarifa_valor|brl }}{% if c.sandbox %} · sandbox{% endif %}</div></div>
+        <span class="badge {{ 'b-ok' if c.status == 'assinado' else ('b-info' if c.status == 'enviado' else 'b-grey') }}">{{ c.status_label }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if pode_cobrar %}
+      <div class="row" style="margin-top:10px"><a class="btn" href="/contratos/novo/{{ lead.id }}">Gerar contrato</a>
+      {% if user.is_staff and not lead.tarifa_recebida %}
+      <form method="post" action="/leads/{{ lead.id }}/tarifa" class="row"><input type="date" name="recebida_em" value="{{ hoje }}" style="width:160px" required><button class="btn ghost" type="submit">Confirmar tarifa recebida</button></form>
+      {% endif %}</div>
+    {% else %}
+      <p class="small muted" style="margin:0">{{ motivo_cobranca }}</p>
+    {% endif %}
+    {% if lead.tarifa_recebida %}<p class="small" style="margin:8px 0 0"><span class="badge b-ok">Tarifa {{ lead.tarifa_valor|brl }} recebida em {{ lead.tarifa_recebida_em|date }}</span></p>{% endif %}
+  </div>
+
+  {# ---------------- Liberações / comissões ---------------- #}
+  <div class="card">
+    <div class="row between"><h2>Liberações e comissão</h2>{% if user.is_staff and lead.triagem_decisao == 'aprovado' %}<a class="btn sm ghost" href="/liberacoes/nova/{{ lead.id }}">＋ Registrar liberação</a>{% endif %}</div>
+    {% if not lead.disbursements %}<p class="muted small">Nenhuma liberação registrada.</p>{% endif %}
+    {% for d in lead.disbursements %}
+    <div class="item" style="margin-bottom:8px">
+      <div class="row between"><div><b>{{ d.banco }}</b> · {{ d.valor_liberado|brl }} · {{ d.data_liberacao|date }}<div class="tiny muted">{{ ExitoTipo.LABELS[d.exito_tipo] }}{% if d.honorarios_emg %} · honorários EMG {{ d.honorarios_emg|brl }}{% endif %}</div></div>
+        <div class="right"><div class="gold"><b>{{ d.comissao_total|brl }}</b></div><div class="tiny muted">tarifa {{ d.comissao_tarifa|brl }} + êxito {{ d.comissao_exito|brl }}</div></div></div>
+      <div class="row" style="margin-top:8px">
+        {% if d.emg_recebeu %}<span class="badge b-ok">EMG recebeu {{ d.emg_recebeu_em|date }}</span>{% elif user.is_staff %}
+        <form method="post" action="/liberacoes/{{ d.id }}/recebido" class="row"><input type="date" name="em" value="{{ hoje }}" style="width:150px"><button class="btn sm ghost">EMG recebeu</button></form>{% else %}<span class="badge b-warn">aguardando recebimento da EMG</span>{% endif %}
+        {% if d.comissao_paga %}<span class="badge b-ok">Comissão paga {{ d.comissao_paga_em|date }}</span>{% elif user.is_staff and d.emg_recebeu %}
+        <form method="post" action="/liberacoes/{{ d.id }}/comissao-paga" class="row"><input type="date" name="em" value="{{ hoje }}" style="width:150px"><button class="btn sm ok">Comissão paga</button></form>{% elif d.emg_recebeu %}<span class="badge b-info">comissão a pagar</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+<div class="stack">
+
+  {# ---------------- Empresa ---------------- #}
+  <div class="card">
+    <div class="row between"><h2>Empresa (Receita Federal)</h2>
+      <form method="post" action="/leads/{{ lead.id }}/enriquecer"><button class="btn sm ghost" type="submit">Consultar de novo</button></form></div>
+    {% if lead.enrichment_error %}<p class="small" style="color:#F0A0A0">{{ lead.enrichment_error }}</p>{% endif %}
+    {% if cad %}
+    <table class="small">
+      <tr><td class="muted">Situação</td><td><b>{{ cad.situacao or '-' }}</b>{% if cad.situacao_data %} <span class="muted">desde {{ cad.situacao_data }}</span>{% endif %}</td></tr>
+      <tr><td class="muted">Abertura</td><td>{{ cad.data_abertura or '-' }}{% if cad.idade_anos is not none %} · {{ cad.idade_anos }} anos{% endif %}</td></tr>
+      <tr><td class="muted">Porte</td><td>{{ cad.porte or '-' }}{% if cad.mei %} · MEI{% endif %}{% if cad.simples %} · Simples{% endif %}</td></tr>
+      <tr><td class="muted">Capital social</td><td>{{ cad.capital_social|brl if cad.capital_social is not none else '-' }}</td></tr>
+      <tr><td class="muted">CNAE</td><td>{{ cad.cnae_codigo or '' }} {{ cad.cnae_descricao or '-' }}</td></tr>
+      <tr><td class="muted">Natureza</td><td>{{ cad.natureza_juridica or '-' }}</td></tr>
+      <tr><td class="muted">Local</td><td>{{ cad.municipio or '' }}{% if cad.uf %}/{{ cad.uf }}{% endif %}</td></tr>
+      <tr><td class="muted">Contato RF</td><td>{{ cad.telefone or '' }} {{ cad.email or '' }}</td></tr>
+      <tr><td class="muted">QSA</td><td>{% for s in cad.qsa %}{{ s.nome }} <span class="muted">({{ s.qualificacao }}{% if s.cpf_mascarado %}, {{ s.cpf_mascarado }}{% endif %})</span>{% if not loop.last %}<br>{% endif %}{% else %}-{% endfor %}</td></tr>
+    </table>
+    <p class="tiny muted">Fonte: {{ cad.fonte }} · {{ lead.enrichment_at|dt }}</p>
+    {% elif lead.enrichment_at %}<p class="muted small">Sem dados cadastrais.</p>{% endif %}
+  </div>
+
+  {# ---------------- Pré-score ---------------- #}
+  <div class="card">
+    <h2>Pré-score EMG</h2>
+    <p class="small muted">Orientativo. Não descarta automaticamente: a decisão de passar é da triagem.</p>
+    <div class="fatores">
+      {% for f in lead.prescore_fatores or [] %}
+      <div class="fator {{ f.nivel }}"><span>{{ f.label }}<span class="muted"> · {{ f.detalhe }}</span></span><b>{{ '+' if f.pontos > 0 }}{{ f.pontos }}</b></div>
+      {% else %}<p class="muted small">Ainda não calculado.</p>{% endfor %}
+    </div>
+    {% if bureau %}
+    <details><summary>Retornos brutos dos bureaus (APIBrasil)</summary>
+      {% for k, v in (bureau.pj or {}).items() %}<p class="small"><b>CNPJ · {{ k }}</b> ({{ v.tipo }}): {{ v.texto }}</p><pre>{{ v.raw | tojson(indent=1) }}</pre>{% endfor %}
+      {% for s in bureau.socios or [] %}<p class="small"><b>{{ s.nome }}</b> {{ s.cpf_mascarado }}</p>
+        {% for k in ('protestos','negativacao','divida_ativa') %}{% if s[k] %}<p class="small">{{ k }} ({{ s[k].tipo }}): {{ s[k].texto }}</p><pre>{{ s[k].raw | tojson(indent=1) }}</pre>{% endif %}{% endfor %}{% endfor %}
+      {% if not bureau.pj and not bureau.socios %}<p class="small muted">Bureau desativado ou sem consultas.</p>{% endif %}
+    </details>
+    {% endif %}
+  </div>
+
+  {# ---------------- LGPD / sócios ---------------- #}
+  <div class="card">
+    <h2>Sócios e LGPD</h2>
+    {% if lead.lgpd_consent %}<p class="small"><span class="badge b-ok">Aceite registrado</span> {{ lead.lgpd_consent_at|dt }}{% if lead.lgpd_consent_by %} · por {{ lead.lgpd_consent_by }}{% endif %}{% if lead.lgpd_consent_meio %} via {{ lead.lgpd_consent_meio }}{% endif %}</p>
+    {% else %}<p class="small"><span class="badge b-warn">Sem aceite LGPD</span> Sem o aceite, o CPF dos sócios não é consultado.</p>{% endif %}
+    <form method="post" action="/leads/{{ lead.id }}/lgpd" class="stack">
+      <div id="socios" class="stack">
+        {% for s in lead.socios_cpf or [] %}
+        <div class="row"><input name="socio_nome" value="{{ s.nome }}" placeholder="Nome do sócio" style="flex:2"><input name="socio_cpf" data-mask="cpf" value="{{ s.cpf|cpf }}" style="flex:1;min-width:150px"></div>
+        {% endfor %}
+      </div>
+      <template id="socio-tpl"><div class="row"><input name="socio_nome" placeholder="Nome do sócio" style="flex:2"><input name="socio_cpf" data-mask="cpf" inputmode="numeric" placeholder="CPF" style="flex:1;min-width:150px"></div></template>
+      <button type="button" class="btn sm ghost" id="add-socio">＋ Adicionar sócio</button>
+      <label class="check"><input type="checkbox" name="lgpd_consent" {{ 'checked' if lead.lgpd_consent }}> Cliente autorizou a consulta dos dados da empresa e dos sócios (LGPD).</label>
+      <div class="row"><input name="lgpd_consent_by" value="{{ lead.lgpd_consent_by or '' }}" placeholder="quem autorizou" style="flex:1"><input name="lgpd_consent_meio" value="{{ lead.lgpd_consent_meio or '' }}" placeholder="meio (WhatsApp, e-mail...)" style="flex:1"></div>
+      <button class="btn sm" type="submit">Salvar e consultar sócios</button>
+    </form>
+  </div>
+
+  {# ---------------- Contato / dados ---------------- #}
+  <div class="card">
+    <h2>Contato e dados do lead</h2>
+    <form method="post" action="/leads/{{ lead.id }}/editar" class="stack">
+      <div class="row"><input name="contato_nome" value="{{ lead.contato_nome or '' }}" placeholder="nome do contato" style="flex:1"><input name="contato_telefone" value="{{ lead.contato_telefone or '' }}" placeholder="WhatsApp" style="flex:1"></div>
+      <div class="row"><input name="contato_email" value="{{ lead.contato_email or '' }}" placeholder="e-mail" style="flex:1">
+        <select name="origem" style="flex:1">{% for o in origens %}<option {{ 'selected' if lead.origem == o }}>{{ o }}</option>{% endfor %}</select>
+        <input name="valor_pretendido" value="{{ ('%.2f'|format(lead.valor_pretendido)).replace('.', ',') if lead.valor_pretendido else '' }}" placeholder="valor pretendido" style="flex:1"></div>
+      <textarea name="observacao" placeholder="observação">{{ lead.observacao or '' }}</textarea>
+      {% if user.is_staff %}
+      <label class="check"><input type="checkbox" name="docs_pendentes" {{ 'checked' if lead.docs_pendentes }}> Documentação pendente</label>
+      <input name="docs_obs" value="{{ lead.docs_obs or '' }}" placeholder="quais documentos faltam">
+      {% endif %}
+      <button class="btn sm ghost" type="submit">Salvar dados</button>
+    </form>
+  </div>
+</div>
+</div>
+
+{# ---------------- Registro de contato / histórico / tarefas ---------------- #}
+<div class="grid g2" style="margin-top:16px;align-items:start">
+  <div class="card">
+    <h2>Registrar contato</h2>
+    <form method="post" action="/leads/{{ lead.id }}/contato" class="stack">
+      <textarea name="descricao" required placeholder="O que foi conversado com o cliente, retorno, próximo passo..."></textarea>
+      <div class="row">
+        <button class="btn" name="tipo" value="contato">Contato com o cliente</button>
+        <button class="btn info" name="tipo" value="posicao">Dei posição ao cliente</button>
+        <button class="btn ghost" name="tipo" value="nota">Só uma nota</button>
+      </div>
+      <p class="tiny muted">Contato registrado pelo captador renova a posse por {{ settings.OWNERSHIP_DAYS }} dias. "Dei posição" conclui a tarefa de feedback.</p>
+    </form>
+    <hr>
+    <h3>Tarefas deste lead</h3>
+    <div class="list">
+      {% for t in tarefas %}
+      <div class="item row between" style="{{ 'opacity:.55' if t.done }}">
+        <div><div class="t">{{ t.titulo }}</div><div class="tiny muted">{{ t.assigned_to.name }}{% if t.due_date %} · {{ t.due_date|date }}{% endif %}{% if t.atrasada %} · <span class="badge b-bad">atrasada</span>{% endif %}{% if t.done %} · concluída{% endif %}</div></div>
+        {% if not t.done and (t.assigned_to_id == user.id or user.is_staff) %}
+        <form method="post" action="/tarefas/{{ t.id }}/concluir"><input type="hidden" name="voltar" value="/leads/{{ lead.id }}"><button class="btn sm ok">Concluir</button></form>{% endif %}
+      </div>
+      {% else %}<p class="muted small">Sem tarefas.</p>{% endfor %}
+    </div>
+    <form method="post" action="/leads/{{ lead.id }}/tarefa" class="row" style="margin-top:10px">
+      <input name="titulo" placeholder="nova tarefa" required style="flex:2;min-width:160px">
+      <select name="tipo" style="flex:1">{% for k, l in TaskType.LABELS.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+      <input type="date" name="due_date" value="{{ hoje }}" style="flex:1;min-width:140px">
+      {% if user.is_staff %}<select name="assigned_to_id" style="flex:1"><option value="">para mim</option><option value="{{ lead.captador_id }}">para {{ lead.captador.name.split(' ')[0] }}</option></select>{% endif %}
+      <button class="btn sm ghost">Criar</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Histórico</h2>
+    <ul class="timeline">
+      {% for a in lead.activities %}
+      <li class="{{ a.tipo }}"><div class="small">{{ a.descricao }}</div><div class="tiny muted">{{ a.created_at|dt }}{% if a.user %} · {{ a.user.name }}{% endif %} · {{ a.tipo }}</div></li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

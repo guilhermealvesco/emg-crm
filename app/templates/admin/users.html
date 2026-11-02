@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Usuários · EMG CRM{% endblock %}
+{% block content %}
+<div class="row between"><h1>Usuários</h1><a class="btn ghost sm" href="/admin/config">Configuração</a></div>
+<div class="grid g2" style="align-items:start">
+  <div class="card">
+    <h2>Cadastrados</h2>
+    <div class="list">
+      {% for u in usuarios %}
+      <details class="item"><summary><b>{{ u.name }}</b> <span class="badge b-gold">{{ roles[u.role] }}</span>{% if not u.active %} <span class="badge b-bad">inativo</span>{% endif %} <span class="tiny muted">{{ u.email }}</span></summary>
+        <form method="post" action="/admin/usuarios/{{ u.id }}" class="stack" style="margin-top:10px">
+          <input name="name" value="{{ u.name }}" required>
+          <div class="row"><select name="role" style="flex:1" {{ 'disabled' if u.id == user.id }}>{% for k, l in roles.items() %}<option value="{{ k }}" {{ 'selected' if u.role == k }}>{{ l }}</option>{% endfor %}</select>
+            <input name="phone" value="{{ u.phone or '' }}" placeholder="telefone" style="flex:1"></div>
+          <input name="password" type="password" placeholder="nova senha (deixe em branco para manter)" autocomplete="new-password">
+          {% if u.id != user.id %}<label class="check"><input type="checkbox" name="active" {{ 'checked' if u.active }}> Ativo</label>{% endif %}
+          <button class="btn sm">Salvar</button>
+        </form></details>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <h2>Novo usuário</h2>
+    <form method="post" action="/admin/usuarios" class="stack">
+      <div class="field"><label>Nome</label><input name="name" required></div>
+      <div class="field"><label>E-mail (login)</label><input name="email" type="email" required></div>
+      <div class="field"><label>Senha inicial</label><input name="password" type="text" required minlength="8"></div>
+      <div class="field"><label>Perfil</label><select name="role">{% for k, l in roles.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Telefone</label><input name="phone"></div>
+      <button class="btn">Criar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0D1724">
+<title>{% block title %}EMG CRM{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+</head>
+<body>
+{% if user %}
+<header class="top"><div class="in">
+  <a class="brand" href="/"><span>EM<b>G</b></span><span class="muted" style="font-family:Jost;font-size:13px;font-weight:400">CRM</span></a>
+  <nav class="nav">
+    <a href="/" class="{{ 'on' if path == '/' }}">Início</a>
+    <a href="/leads" class="{{ 'on' if path.startswith('/leads') }}">Leads</a>
+    {% if user.is_staff %}<a href="/bancos" class="{{ 'on' if path.startswith('/bancos') }}">Bancos</a>{% endif %}
+    <a href="/tarefas" class="{{ 'on' if path.startswith('/tarefas') }}">Tarefas</a>
+    <a href="/contratos" class="{{ 'on' if path.startswith('/contratos') }}">Contratos</a>
+    <a href="/liberacoes" class="{{ 'on' if path.startswith('/liberacoes') }}">Liberações</a>
+    <a href="/alertas" class="{{ 'on' if path.startswith('/alertas') }}">Alertas</a>
+    {% if user.is_staff %}<a href="/ranking" class="{{ 'on' if path.startswith('/ranking') }}">Ranking</a>{% endif %}
+    {% if user.is_admin %}<a href="/admin/usuarios" class="{{ 'on' if path.startswith('/admin') }}">Admin</a>{% endif %}
+    <a href="/senha" title="{{ user.email }}">{{ user.name.split(' ')[0] }}</a>
+    <a href="/logout">Sair</a>
+  </nav>
+</div></header>
+{% endif %}
+<main class="wrap">
+  {% for f in flashes %}<div class="flash {{ f.k }}">{{ f.m }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% if user %}
+<nav class="bottom">
+  <a href="/" class="{{ 'on' if path == '/' }}"><span>⌂</span>Início</a>
+  <a href="/leads" class="{{ 'on' if path.startswith('/leads') }}"><span>▤</span>Leads</a>
+  {% if user.is_staff %}<a href="/bancos" class="{{ 'on' if path.startswith('/bancos') }}"><span>🏦</span>Bancos</a>{% endif %}
+  <a href="/tarefas" class="{{ 'on' if path.startswith('/tarefas') }}"><span>✓</span>Tarefas</a>
+  <a href="/leads/novo" class="{{ 'on' if path == '/leads/novo' }}"><span>＋</span>Lead</a>
+  <a href="/alertas" class="{{ 'on' if path.startswith('/alertas') }}"><span>!</span>Alertas</a>
+</nav>
+{% endif %}
+<script src="/static/app.js"></script>
+</body>
+</html>

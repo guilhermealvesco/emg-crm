@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Alertas · EMG CRM{% endblock %}
+{% block content %}
+<h1>Alertas</h1>
+<p class="muted">Leads parados, bancos sem envio, docs pendentes e clientes sem follow-up. Calculado em tempo real.</p>
+{% if not com_alerta %}<div class="card"><p class="muted">Nenhum alerta. Tudo em dia.</p></div>{% endif %}
+<div class="list alerts">
+  {% for lead, als in com_alerta %}
+  <div class="item {{ 'alto' if als|selectattr('nivel','equalto','alto')|list }}">
+    <div class="row between">
+      <div>
+        <div class="t"><a href="/leads/{{ lead.id }}">{{ lead.nome }}</a> <span class="stage-pill {{ lead.stage }}">{{ lead.stage_label }}</span>
+          {% if user.is_staff %}<span class="tiny muted">· {{ lead.captador.name }}</span>{% endif %}</div>
+        <ul class="small" style="margin:6px 0 0 18px;padding:0">{% for a in als %}<li>{{ a.texto }}</li>{% endfor %}</ul>
+      </div>
+      <a class="btn sm ghost" href="/leads/{{ lead.id }}">Abrir</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

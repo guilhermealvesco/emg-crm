@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Contratos · EMG CRM{% endblock %}
+{% block content %}
+<h1>Contratos</h1>
+<div class="card"><div class="tbl-wrap"><table>
+  <tr><th>Arquivo</th><th>Cliente</th><th>Tarifa</th><th>Status</th><th>Enviado</th><th>Assinado</th>{% if user.is_staff %}<th>Captador</th>{% endif %}</tr>
+  {% for c in contratos %}
+  <tr><td><a href="/contratos/{{ c.id }}">{{ c.file_basename }}.pdf</a>{% if c.sandbox %} <span class="badge b-grey">sandbox</span>{% endif %}</td>
+    <td><a href="/leads/{{ c.lead_id }}">{{ c.razao_social }}</a><div class="tiny muted">{{ c.cnpj }}</div></td>
+    <td>{{ c.tarifa_valor|brl }}</td>
+    <td><span class="badge {{ 'b-ok' if c.status == 'assinado' else ('b-info' if c.status == 'enviado' else ('b-bad' if c.status in ('recusado','cancelado') else 'b-grey')) }}">{{ c.status_label }}</span></td>
+    <td class="small muted">{{ c.sent_at|dt }}</td><td class="small muted">{{ c.signed_at|dt }}</td>
+    {% if user.is_staff %}<td class="small">{{ c.lead.captador.name.split(' ')[0] }}</td>{% endif %}</tr>
+  {% else %}<tr><td colspan="7" class="muted">Nenhum contrato ainda.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

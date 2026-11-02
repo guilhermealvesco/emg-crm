@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Registrar liberação · EMG CRM{% endblock %}
+{% block content %}
+<h1>Registrar liberação</h1>
+<p class="muted">{{ lead.nome }} · {{ lead.cnpj|cnpj }} · captador {{ lead.captador.name }}</p>
+<form method="post" action="/liberacoes/nova/{{ lead.id }}" class="card stack" style="max-width:560px">
+  <div class="field"><label>Banco</label><select name="banco">{% for b in bancos %}<option {{ 'selected' if bons and bons[0].banco == b }}>{{ b }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Valor liberado (R$)</label><input name="valor" inputmode="decimal" required placeholder="ex.: 350.000,00"></div>
+  <div class="field"><label>Data da liberação</label><input type="date" name="data_liberacao" value="{{ hoje }}" required></div>
+  <div class="field"><label>Tipo de êxito do captador</label>
+    <select name="exito_tipo">{% for k, l in ExitoTipo.LABELS.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+    <p class="tiny muted">Indicação: 3% até R$ 500 mil + 1% no excedente. Fechamento completo: 5% + 2%. A comissão da tarifa (excedente acima de {{ piso|brl }}) entra na primeira liberação do lead.</p></div>
+  <div class="field"><label>Honorários de êxito cobrados do cliente (R$, informativo)</label><input name="honorarios_emg" inputmode="decimal"></div>
+  <div class="field"><label>Observação</label><input name="observacao"></div>
+  <button class="btn block" type="submit">Registrar e calcular comissão</button>
+</form>
+{% endblock %}
