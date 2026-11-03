@@ -6,12 +6,14 @@
 <form method="post" action="/leads/novo" class="grid g2" style="align-items:start">
   <div class="card stack">
     <h2>Empresa</h2>
+    <p class="small muted" style="margin-top:0">Só o CNPJ é obrigatório. Contato, responsável e o resto podem ser completados depois na página do lead.</p>
+    {% if user.is_staff %}
+    <div class="field"><label>Este cadastro é de qual captador?</label><select name="captador_id"><option value="">Meu (sem captador)</option>{% for c in captadores %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+      <p class="tiny muted">O lead entra no CRM do captador escolhido e conta para o ranking e a comissão dele.</p></div>
+    {% endif %}
     <div class="field"><label>CNPJ *</label><input name="cnpj" data-mask="cnpj" required inputmode="numeric" placeholder="00.000.000/0000-00" autofocus></div>
     <div class="field"><label>Valor de crédito pretendido (R$)</label><input name="valor_pretendido" inputmode="decimal" placeholder="ex.: 300.000"></div>
     <div class="field"><label>Origem</label><select name="origem">{% for o in origens %}<option>{{ o }}</option>{% endfor %}</select></div>
-    {% if user.is_staff %}
-    <div class="field"><label>Captador responsável</label><select name="captador_id"><option value="">Eu mesmo ({{ user.name }})</option>{% for c in captadores %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
-    {% endif %}
     <h2 style="margin-top:14px">Contato na empresa</h2>
     <div class="field"><label>Nome</label><input name="contato_nome"></div>
     <div class="field"><label>WhatsApp / telefone</label><input name="contato_telefone" inputmode="tel"></div>

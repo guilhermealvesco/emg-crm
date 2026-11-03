@@ -107,6 +107,9 @@ def calcular(cadastral: dict | None, bureau: dict | None) -> tuple[str, int, lis
         if not r:
             fatores.append(_f(label, 0, "não consultado"))
             continue
+        if r.get("homolog"):
+            fatores.append(_f(label, 0, "modo teste (homologação): dado fictício, não pontua"))
+            continue
         if r.get("consta") is True:
             extra = 0
             if r.get("quantidade"):
@@ -131,6 +134,9 @@ def calcular(cadastral: dict | None, bureau: dict | None) -> tuple[str, int, lis
             r = s.get(chave)
             if not r:
                 continue
+            if r.get("homolog"):
+                fatores.append(_f(f"{label} ({nome})", 0, "modo teste (homologação): dado fictício, não pontua"))
+                continue
             if r.get("consta") is True:
                 fatores.append(_f(f"{label} ({nome})", peso_ruim, r.get("texto", "consta")))
                 pontos += peso_ruim
@@ -150,3 +156,10 @@ def calcular(cadastral: dict | None, bureau: dict | None) -> tuple[str, int, lis
     else:
         cor = Prescore.AMARELO
     return cor, pontos, fatores
+
+
+def recalcular_lead(lead) -> None:
+    """Recalcula com os dados já guardados no lead, sem nova consulta (não gasta crédito)."""
+    enr = lead.enrichment or {}
+    cor, pontos, fatores = calcular(enr.get("cadastral"), enr.get("bureau"))
+    lead.prescore, lead.prescore_pontos, lead.prescore_fatores = cor, pontos, fatores

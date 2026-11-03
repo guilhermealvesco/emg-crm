@@ -1,9 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Configuração · EMG CRM{% endblock %}
+{% block title %}Configuração · EMG CRM<div class="card" style="margin-top:14px"><h3>Pré-score</h3><p class="small muted">Recalcula todos os leads com os dados já consultados (não gasta crédito). Use depois de mudar a regra.</p>
+<form method="post" action="/admin/recalcular-prescore"><button class="btn ghost">Recalcular pré-score</button></form></div>
+{% endblock %}
 {% block content %}
 <h1>Configuração</h1>
 <div class="card"><table>{% for k, v in info.items() %}<tr><td class="muted" style="width:220px">{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
 <p class="tiny muted">Os valores vêm do arquivo .env na VPS. Para alterar, edite o .env e reinicie o serviço.</p></div>
 <div class="card" style="margin-top:14px"><h3>Rotina diária</h3><p class="small muted">Roda todo dia às 07:15 e cria as tarefas de "dar posição ao cliente". Pode ser disparada agora.</p>
 <form method="post" action="/admin/rotina"><button class="btn ghost">Executar agora</button></form></div>
+<div class="card" style="margin-top:14px"><h3>Pré-score</h3><p class="small muted">Recalcula todos os leads com os dados já consultados (não gasta crédito). Use depois de mudar a regra.</p>
+<form method="post" action="/admin/recalcular-prescore"><button class="btn ghost">Recalcular pré-score</button></form></div>
 {% endblock %}

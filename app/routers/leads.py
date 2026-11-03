@@ -138,7 +138,33 @@ def detalhe(request: Request, lead_id: int, user: User = Depends(get_current_use
     return render(request, "leads/detail.html", user=user, lead=lead, bancos=settings.BANCOS,
                   alertas=alerts.alertas_do_lead(lead), pode_cobrar=pode_cobrar, motivo_cobranca=motivo_cobranca,
                   tarefas=tarefas, hoje=today_local(), origens=ORIGENS,
-                  banks_by_name={b.banco: b for b in lead.banks})
+                  banks_by_name={b.banco: b for b in lead.banks},
+                  captadores=db.scalars(select(User).where(User.role == Role.CAPTADOR, User.active.is_(True))
+                                        .order_by(User.name)).all() if user.is_staff else [])
+
+
+@router.post("/{lead_id}/captador")
+def trocar_captador(request: Request, lead_id: int, captador_id: int = Form(...),
+                    user: User = Depends(require_staff), db: Session = Depends(get_db)):
+    """Atribui o lead a um captador (conta no ranking e nas comissões dele)."""
+    from datetime import timedelta
+    lead = _get_lead(db, lead_id, user)
+    novo = db.get(User, captador_id)
+    if not novo or novo.role != Role.CAPTADOR:
+        flash(request, "Captador inválido.", "erro")
+        return RedirectResponse(f"/leads/{lead.id}", status_code=303)
+    antigo = lead.captador.name if lead.captador else "-"
+    lead.captador_id = novo.id
+    lead.owner_until = today_local() + timedelta(days=settings.OWNERSHIP_DAYS)
+    for t in lead.tasks:
+        if not t.done and t.tipo in (TaskType.POSICAO, TaskType.DOCS):
+            t.assigned_to_id = novo.id
+    for d in lead.disbursements:
+        if not d.comissao_paga:
+            d.captador_id = novo.id
+    svc.registrar_contato(db, lead, user, f"Lead atribuído a {novo.name} (antes: {antigo}) por {user.name}.", "nota")
+    flash(request, f"Lead agora é de {novo.name}.")
+    return RedirectResponse(f"/leads/{lead.id}", status_code=303)
 
 
 @router.post("/{lead_id}/contato")

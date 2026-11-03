@@ -256,3 +256,29 @@ def test_rotina_diaria_cria_posicao(client):
     assert r["tarefas_posicao_criadas"] == 1
     assert rotina_diaria(db)["tarefas_posicao_criadas"] == 0  # idempotente
     db.close()
+
+
+def test_staff_cadastra_para_captador_e_reatribui(client):
+    from sqlalchemy import select
+    login(client, "op@emg")
+    db = SessionLocal()
+    bruno = db.scalar(select(models.User).where(models.User.email == "bruno@emg"))
+    silas = db.scalar(select(models.User).where(models.User.email == "silas@emg"))
+    db.close()
+    r = client.post("/leads/novo", data={"cnpj": "60.975.099/0001-79", "captador_id": str(bruno.id)}, follow_redirects=False)
+    assert r.status_code == 303
+    lid = int(r.headers["location"].rsplit("/", 1)[1])
+    db = SessionLocal(); lead = db.get(models.Lead, lid)
+    assert lead.captador_id == bruno.id and lead.contato_nome is None
+    db.close()
+    client.post(f"/leads/{lid}/captador", data={"captador_id": str(silas.id)})
+    db = SessionLocal(); assert db.get(models.Lead, lid).captador_id == silas.id; db.close()
+
+
+def test_homologacao_nao_pontua():
+    from app.enrichment import prescore
+    cad = {"situacao": "ATIVA", "idade_anos": 3, "porte": "MICRO EMPRESA", "capital_social": 10000, "qsa": []}
+    fake = {"consta": True, "quantidade": 5, "texto": "consta", "homolog": True}
+    _, pts_h, _ = prescore.calcular(cad, {"pj": {"protestos": fake, "negativacao": fake, "certidao": fake}, "socios": []})
+    _, pts_0, _ = prescore.calcular(cad, None)
+    assert pts_h == pts_0

@@ -86,3 +86,15 @@ def rodar_rotina(request: Request, user: User = Depends(require_admin), db: Sess
     r = alerts.rotina_diaria(db)
     flash(request, f"Rotina executada: {r['tarefas_posicao_criadas']} tarefa(s) de posição criada(s).")
     return RedirectResponse("/admin/config", status_code=303)
+
+
+@router.post("/recalcular-prescore")
+def recalcular_prescore(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    from ..enrichment.prescore import recalcular_lead
+    from ..models import Lead
+    leads = db.scalars(select(Lead).where(Lead.enrichment.is_not(None))).all()
+    for l in leads:
+        recalcular_lead(l)
+    db.commit()
+    flash(request, f"Pré-score recalculado em {len(leads)} lead(s), sem nova consulta.")
+    return RedirectResponse("/admin/config", status_code=303)

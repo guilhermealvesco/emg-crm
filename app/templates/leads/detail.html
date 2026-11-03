@@ -35,6 +35,11 @@
   {% if user.is_staff %}
   <div class="card">
     <h2>Operação</h2>
+    <form method="post" action="/leads/{{ lead.id }}/captador" class="row" style="margin-bottom:12px">
+      <span class="small muted">Captador:</span>
+      <select name="captador_id" style="flex:1">{% for c in captadores %}<option value="{{ c.id }}" {{ 'selected' if c.id == lead.captador_id }}>{{ c.name }}</option>{% endfor %}</select>
+      <button class="btn sm ghost" type="submit">Atribuir</button>
+    </form>
     {% if lead.stage in ('novo','triagem') and not lead.triagem_decisao %}
     <form method="post" action="/leads/{{ lead.id }}/triagem" class="stack">
       <p class="small muted">O pré-score é orientativo. Empresa nova com sócio forte pode passar. A decisão é sua.</p>
