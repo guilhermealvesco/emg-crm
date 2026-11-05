@@ -13,47 +13,31 @@ from . import apibrasil, cadastral, prescore
 log = logging.getLogger(__name__)
 
 
+def _consulta(tipo: str, doc: str) -> dict:
+    res = apibrasil.consultar(tipo, doc)
+    resumo = apibrasil.ler_pendencias(res)
+    resumo.update({"tipo": tipo, "raw": res.get("data"), "ok": res.get("ok", False),
+                   "homolog": res.get("homolog", False)})
+    return resumo
+
+
 def _bureau_pj(cnpj: str) -> dict:
-    if not settings.APIBRASIL_ENABLED:
+    if not settings.APIBRASIL_ENABLED or not settings.APIBRASIL_TIPO_PJ:
         return {}
-    out = {}
-    for chave, tipo in (("protestos", settings.APIBRASIL_TIPO_PROTESTO_PJ),
-                        ("negativacao", settings.APIBRASIL_TIPO_NEGATIVACAO_PJ),
-                        ("certidao", settings.APIBRASIL_TIPO_CERTIDAO_PJ)):
-        if not tipo:
-            continue
-        res = apibrasil.consultar(tipo, cnpj)
-        resumo = apibrasil.resumir(res)
-        resumo["tipo"] = tipo
-        resumo["raw"] = res.get("data")
-        resumo["ok"] = res.get("ok", False)
-        resumo["homolog"] = res.get("homolog", False)
-        out[chave] = resumo
-    return out
+    return {"pendencias": _consulta(settings.APIBRASIL_TIPO_PJ, cnpj)}
 
 
 def _bureau_socios(lead: Lead) -> list[dict]:
-    if not settings.APIBRASIL_ENABLED or not lead.lgpd_consent or not lead.socios_cpf:
+    if (not settings.APIBRASIL_ENABLED or not settings.APIBRASIL_TIPO_PF or not lead.lgpd_consent
+            or not lead.socios_cpf):
         return []
     saida = []
     for s in lead.socios_cpf:
         cpf = only_digits(s.get("cpf"))
         if len(cpf) != 11:
             continue
-        item = {"nome": s.get("nome") or "Sócio", "cpf_mascarado": f"***.{cpf[3:6]}.{cpf[6:9]}-**"}
-        for chave, tipo in (("protestos", settings.APIBRASIL_TIPO_PROTESTO_PF),
-                            ("negativacao", settings.APIBRASIL_TIPO_NEGATIVACAO_PF),
-                            ("divida_ativa", settings.APIBRASIL_TIPO_DIVIDA_ATIVA_PF)):
-            if not tipo:
-                continue
-            res = apibrasil.consultar(tipo, cpf)
-            resumo = apibrasil.resumir(res)
-            resumo["tipo"] = tipo
-            resumo["raw"] = res.get("data")
-            resumo["ok"] = res.get("ok", False)
-            resumo["homolog"] = res.get("homolog", False)
-            item[chave] = resumo
-        saida.append(item)
+        saida.append({"nome": s.get("nome") or "Sócio", "cpf_mascarado": f"***.{cpf[3:6]}.{cpf[6:9]}-**",
+                      "pendencias": _consulta(settings.APIBRASIL_TIPO_PF, cpf)})
     return saida
 
 

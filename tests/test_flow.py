@@ -89,6 +89,43 @@ def test_comissao_exito():
     assert commissions.comissao_exito(800_000, "fechamento") == 25_000 + 6_000
 
 
+REAL_LIMPO = {"ok": True, "homolog": False, "data": {
+    "api_limit_for": "credit", "balance": "21,340", "message": "Dados validos! Voce foi tarifado em R$ 12,00.",
+    "error": False, "homolog": False,
+    "data": {"cnpj": "61949494000140", "pendencias": [], "pessoaFisica": None,
+             "pessoaJuridica": {"pendenciaFinanceira": {"acoesJudiciais": [], "chequesSemFundo": [], "negativacoes": [],
+                                                        "protestos": [], "recuperacoesJudiciaisFalencia": [],
+                                                        "status": "N\u00e3o Consta Pend\u00eancia", "totalPendencia": 0}},
+             "possuiPendencias": False, "status": "Nao foram encontradas pendencias.", "totalPendencias": 0}}}
+
+
+def test_leitura_retorno_real_limpo():
+    r = apibrasil.ler_pendencias(REAL_LIMPO)
+    assert r["consta"] is False and r["quantidade"] == 0 and r["estruturado"]
+    assert apibrasil.resumir(REAL_LIMPO)["consta"] is not True
+
+
+def test_leitura_retorno_com_pendencias():
+    import copy
+    d = copy.deepcopy(REAL_LIMPO)
+    pf = d["data"]["data"]["pessoaJuridica"]["pendenciaFinanceira"]
+    pf["protestos"] = [{"valor": 1500.0}, {"valor": "2.000,00"}]
+    pf["negativacoes"] = [{"valor": 800}]
+    pf["totalPendencia"] = 3
+    d["data"]["data"]["possuiPendencias"] = True
+    r = apibrasil.ler_pendencias(d)
+    assert r["consta"] is True and r["quantidade"] == 3
+    assert r["detalhes"]["protestos"] == 2 and r["detalhes"]["negativacoes"] == 1
+    assert abs(r["valor"] - 4300.0) < 0.01
+    from app.enrichment import prescore
+    cad = {"situacao": "ATIVA", "idade_anos": 6, "porte": "MICRO EMPRESA", "capital_social": 50000, "qsa": []}
+    cor, pts, _ = prescore.calcular(cad, {"pj": {"pendencias": r}, "socios": []})
+    assert pts == 50 + 5 + 15 + 0 + 5 - 24 and cor == "amarelo"
+    r_limpo = apibrasil.ler_pendencias(REAL_LIMPO)
+    cor2, pts2, _ = prescore.calcular(cad, {"pj": {"pendencias": r_limpo}, "socios": []})
+    assert pts2 == 85 and cor2 == "verde"
+
+
 def test_resumo_apibrasil():
     r = apibrasil.resumir({"ok": True, "data": {"response": {"mensagem": "Nao constam protestos", "protestos": []}}})
     assert r["consta"] is False
@@ -116,7 +153,7 @@ def test_fluxo_completo(client):
     assert lead.razao_social == "PADARIA DO JOAO LTDA"
     assert lead.prescore in ("verde", "amarelo", "vermelho")
     assert lead.stage == models.Stage.TRIAGEM
-    assert lead.enrichment["bureau"]["socios"][0]["cpf_mascarado"].startswith("***")
+    assert "bureau" not in lead.enrichment  # bureau pago não roda no cadastro
     assert len(lead.banks) == 5
     db.close()
 
@@ -141,6 +178,10 @@ def test_fluxo_completo(client):
 
     # operação aprova
     login(client, "op@emg")
+    client.post(f"/leads/{lead_id}/bureau")
+    db = SessionLocal(); lead = db.get(models.Lead, lead_id)
+    assert lead.enrichment["bureau"]["pj"]["pendencias"]["tipo"] == "detalhamento-negativo"
+    db.close()
     r = client.post(f"/leads/{lead_id}/triagem", data={"decisao": "aprovado", "obs": "sócio forte"}, follow_redirects=False)
     assert r.status_code == 303
     db = SessionLocal()

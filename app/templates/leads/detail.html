@@ -155,6 +155,12 @@
   <div class="card">
     <h2>Pré-score EMG</h2>
     <p class="small muted">Orientativo. Não descarta automaticamente: a decisão de passar é da triagem.</p>
+    {% if user.is_staff %}
+    <form method="post" action="/leads/{{ lead.id }}/bureau" data-confirm="Consultar pendências na APIBrasil? Custo aproximado R$ {{ settings.APIBRASIL_CUSTO_ESTIMADO }} por consulta." class="row" style="margin-bottom:10px">
+      <button class="btn sm" type="submit">Consultar pendências (bureau)</button>
+      <span class="tiny muted">pago, ~R$ {{ settings.APIBRASIL_CUSTO_ESTIMADO }} por consulta{% if settings.APIBRASIL_HOMOLOG %} · modo teste ativo{% endif %}</span>
+    </form>
+    {% endif %}
     <div class="fatores">
       {% for f in lead.prescore_fatores or [] %}
       <div class="fator {{ f.nivel }}"><span>{{ f.label }}<span class="muted"> · {{ f.detalhe }}</span></span><b>{{ '+' if f.pontos > 0 }}{{ f.pontos }}</b></div>
@@ -163,8 +169,7 @@
     {% if bureau %}
     <details><summary>Retornos brutos dos bureaus (APIBrasil)</summary>
       {% for k, v in (bureau.pj or {}).items() %}<p class="small"><b>CNPJ · {{ k }}</b> ({{ v.tipo }}): {{ v.texto }}</p><pre>{{ v.raw | tojson(indent=1) }}</pre>{% endfor %}
-      {% for s in bureau.socios or [] %}<p class="small"><b>{{ s.nome }}</b> {{ s.cpf_mascarado }}</p>
-        {% for k in ('protestos','negativacao','divida_ativa') %}{% if s[k] %}<p class="small">{{ k }} ({{ s[k].tipo }}): {{ s[k].texto }}</p><pre>{{ s[k].raw | tojson(indent=1) }}</pre>{% endif %}{% endfor %}{% endfor %}
+      {% for s in bureau.socios or [] %}{% if s.pendencias %}<p class="small"><b>{{ s.nome }}</b> {{ s.cpf_mascarado }} ({{ s.pendencias.tipo }}): {{ s.pendencias.texto }}</p><pre>{{ s.pendencias.raw | tojson(indent=1) }}</pre>{% endif %}{% endfor %}
       {% if not bureau.pj and not bureau.socios %}<p class="small muted">Bureau desativado ou sem consultas.</p>{% endif %}
     </details>
     {% endif %}

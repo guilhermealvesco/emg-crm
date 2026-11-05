@@ -125,8 +125,8 @@ async def criar(request: Request, bg: BackgroundTasks, user: User = Depends(get_
     except svc.LeadError as e:
         flash(request, str(e), "erro")
         return RedirectResponse("/leads/novo", status_code=303)
-    bg.add_task(_enrich_bg, lead.id, user.id, True)
-    flash(request, "Lead registrado. Consultando Receita Federal e bureaus, a página atualiza em instantes.")
+    bg.add_task(_enrich_bg, lead.id, user.id, False)
+    flash(request, "Lead registrado. Consultando a Receita Federal, a página atualiza em instantes.")
     return RedirectResponse(f"/leads/{lead.id}", status_code=303)
 
 
@@ -224,11 +224,7 @@ async def lgpd(request: Request, lead_id: int, bg: BackgroundTasks, user: User =
     lead.lgpd_consent_by = (form.get("lgpd_consent_by") or "").strip() or None
     lead.lgpd_consent_meio = (form.get("lgpd_consent_meio") or "").strip() or None
     db.commit()
-    if socios and consent:
-        bg.add_task(_enrich_bg, lead.id, user.id, True)
-        flash(request, "Consentimento registrado. Consultando os sócios, a página atualiza em instantes.")
-    else:
-        flash(request, "Consentimento atualizado.")
+    flash(request, "Sócios e consentimento salvos. A consulta de pendências é feita pela operação.")
     return RedirectResponse(f"/leads/{lead.id}", status_code=303)
 
 
@@ -236,8 +232,18 @@ async def lgpd(request: Request, lead_id: int, bg: BackgroundTasks, user: User =
 def reenriquecer(request: Request, lead_id: int, bg: BackgroundTasks, user: User = Depends(get_current_user),
                  db: Session = Depends(get_db)):
     lead = _get_lead(db, lead_id, user)
-    bg.add_task(_enrich_bg, lead.id, user.id, user.is_staff)  # captador refaz só as fontes gratuitas (sem gastar crédito)
+    bg.add_task(_enrich_bg, lead.id, user.id, False)  # só fontes gratuitas (Receita), não gasta crédito
     flash(request, "Consulta em andamento. Recarregue a página em instantes.")
+    return RedirectResponse(f"/leads/{lead.id}", status_code=303)
+
+
+@router.post("/{lead_id}/bureau")
+def consultar_bureau(request: Request, lead_id: int, bg: BackgroundTasks, user: User = Depends(require_staff),
+                     db: Session = Depends(get_db)):
+    """Consulta paga de pendências financeiras (APIBrasil). Só a operação dispara."""
+    lead = _get_lead(db, lead_id, user)
+    bg.add_task(_enrich_bg, lead.id, user.id, True)
+    flash(request, "Consultando pendências (APIBrasil). Recarregue a página em alguns segundos.")
     return RedirectResponse(f"/leads/{lead.id}", status_code=303)
 
 

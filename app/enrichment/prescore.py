@@ -2,17 +2,32 @@
 
 O pré-score é orientativo: NÃO descarta leads. A decisão de triagem é humana (Guilherme/Eduarda).
 Faixas iniciais (calibrar com casos reais nos primeiros 30 dias):
-  verde    >= 65 pontos
-  amarelo  40 a 64
-  vermelho < 40, ou empresa com situação cadastral diferente de ATIVA
+  verde    >= 60 pontos
+  amarelo  35 a 59
+  vermelho < 35, ou empresa com situação cadastral diferente de ATIVA
 """
 from __future__ import annotations
 
 from ..models import Prescore
 
 BASE = 50
-VERDE_MIN = 65
-AMARELO_MIN = 40
+VERDE_MIN = 60
+AMARELO_MIN = 35
+
+# Bureau (régua revista em 05/11/2026: descontos com teto, para não zerar empresa boa com problema pontual)
+NADA_CONSTA_PJ = 10
+PESOS_PJ = {"protestos": -12, "negativacoes": -12, "chequesSemFundo": -8, "acoesJudiciais": -5}
+TETO_PJ = -30            # soma máxima de descontos do CNPJ (fora RJ/falência)
+PESO_RJ = -30            # recuperação judicial / falência
+PESO_SOCIO = -5          # por categoria com pendência
+TETO_SOCIOS = -15        # soma máxima de descontos de todos os sócios
+NADA_CONSTA_SOCIO = 3
+BONUS_SOCIOS_MAX = 6
+
+
+def apibrasil_label(k: str) -> str:
+    return {"protestos": "Protestos", "negativacoes": "Negativações", "chequesSemFundo": "Cheques sem fundo",
+            "acoesJudiciais": "Ações judiciais"}.get(k, k)
 
 
 def _f(label: str, pontos: int, detalhe: str = "") -> dict:
@@ -96,57 +111,64 @@ def calcular(cadastral: dict | None, bureau: dict | None) -> tuple[str, int, lis
         qsa = cadastral.get("qsa") or []
         fatores.append(_f("Quadro societário", 0, f"{len(qsa)} sócio(s)" if qsa else "não informado"))
 
-    # ---- bureau PJ
+    # ---- bureau PJ (uma consulta de pendências financeiras)
     pj = (bureau or {}).get("pj") or {}
-    for chave, label, peso_ruim, peso_bom in (
-        ("protestos", "Protestos (CNPJ)", -20, 5),
-        ("negativacao", "Negativações (CNPJ)", -20, 5),
-        ("certidao", "Débitos federais / PGFN (CNPJ)", -10, 5),
-    ):
-        r = pj.get(chave)
-        if not r:
-            fatores.append(_f(label, 0, "não consultado"))
-            continue
-        if r.get("homolog"):
-            fatores.append(_f(label, 0, "modo teste (homologação): dado fictício, não pontua"))
-            continue
-        if r.get("consta") is True:
-            extra = 0
-            if r.get("quantidade"):
-                extra = -min(10, int(r["quantidade"]) * 2)
-            fatores.append(_f(label, peso_ruim + extra, r.get("texto", "consta")))
-            pontos += peso_ruim + extra
-        elif r.get("consta") is False:
-            fatores.append(_f(label, peso_bom, r.get("texto", "nada consta")))
-            pontos += peso_bom
-        else:
-            fatores.append(_f(label, 0, r.get("texto", "sem leitura automática; conferir o retorno bruto")))
+    r = pj.get("pendencias")
+    if not r:
+        fatores.append(_f("Pendências financeiras (CNPJ)", 0, "não consultado"))
+    elif r.get("homolog"):
+        fatores.append(_f("Pendências financeiras (CNPJ)", 0, "modo teste (homologação): dado fictício, não pontua"))
+    elif r.get("consta") is False:
+        fatores.append(_f("Pendências financeiras (CNPJ)", NADA_CONSTA_PJ, "nada consta"))
+        pontos += NADA_CONSTA_PJ
+    elif r.get("consta") is True:
+        det = r.get("detalhes") or {}
+        if det.get("recuperacoesJudiciaisFalencia"):
+            fatores.append(_f("Recuperação judicial / falência", PESO_RJ, f"{det['recuperacoesJudiciaisFalencia']} registro(s)"))
+            pontos += PESO_RJ
+        soma = 0
+        itens = []
+        for k, peso in PESOS_PJ.items():
+            if det.get(k):
+                soma += peso
+                itens.append(_f(f"{apibrasil_label(k)} (CNPJ)", peso, f"{det[k]} registro(s)"))
+        if not itens:  # consta, mas sem detalhe por categoria
+            soma = PESOS_PJ["negativacoes"]
+            itens.append(_f("Pendências financeiras (CNPJ)", soma, r.get("texto", "consta")))
+        if soma < TETO_PJ:
+            itens.append(_f("Teto de desconto do bureau (CNPJ)", TETO_PJ - soma, f"desconto limitado a {TETO_PJ}"))
+            soma = TETO_PJ
+        fatores += itens
+        pontos += soma
+    else:
+        fatores.append(_f("Pendências financeiras (CNPJ)", 0, r.get("texto", "sem leitura automática; conferir o retorno bruto")))
 
     # ---- bureau sócios (só com consentimento LGPD)
     socios = (bureau or {}).get("socios") or []
-    for s in socios:
-        nome = s.get("nome") or "Sócio"
-        for chave, label, peso_ruim, peso_bom in (
-            ("protestos", "Protestos", -10, 3),
-            ("negativacao", "Negativações", -10, 3),
-            ("divida_ativa", "Dívida ativa", -5, 2),
-        ):
-            r = s.get(chave)
-            if not r:
-                continue
-            if r.get("homolog"):
-                fatores.append(_f(f"{label} ({nome})", 0, "modo teste (homologação): dado fictício, não pontua"))
-                continue
-            if r.get("consta") is True:
-                fatores.append(_f(f"{label} ({nome})", peso_ruim, r.get("texto", "consta")))
-                pontos += peso_ruim
-            elif r.get("consta") is False:
-                fatores.append(_f(f"{label} ({nome})", peso_bom, r.get("texto", "nada consta")))
-                pontos += peso_bom
-            else:
-                fatores.append(_f(f"{label} ({nome})", 0, r.get("texto", "sem leitura automática")))
+    desc_socios = 0
+    bonus_socios = 0
+    for s_ in socios:
+        nome = s_.get("nome") or "Sócio"
+        r = s_.get("pendencias")
+        if not r:
+            continue
+        if r.get("homolog"):
+            fatores.append(_f(f"Pendências ({nome})", 0, "modo teste (homologação): não pontua"))
+        elif r.get("consta") is True:
+            det = r.get("detalhes") or {}
+            n_cat = sum(1 for k in PESOS_PJ if det.get(k)) or 1
+            d = max(TETO_SOCIOS - desc_socios, PESO_SOCIO * n_cat)
+            desc_socios += d
+            fatores.append(_f(f"Pendências ({nome})", d, r.get("texto", "consta")))
+        elif r.get("consta") is False:
+            b_ = min(NADA_CONSTA_SOCIO, BONUS_SOCIOS_MAX - bonus_socios)
+            bonus_socios += b_
+            fatores.append(_f(f"Pendências ({nome})", b_, "nada consta"))
+        else:
+            fatores.append(_f(f"Pendências ({nome})", 0, r.get("texto", "sem leitura automática")))
+    pontos += desc_socios + bonus_socios
     if not socios:
-        fatores.append(_f("Consulta dos sócios (CPF)", 0, "não realizada (precisa de aceite LGPD e CPF dos sócios)"))
+        fatores.append(_f("Consulta dos sócios (CPF)", 0, "não realizada"))
 
     pontos = max(0, min(100, pontos))
     if forcar_vermelho or pontos < AMARELO_MIN:

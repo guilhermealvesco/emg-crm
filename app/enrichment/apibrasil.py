@@ -60,10 +60,9 @@ def consultar(tipo: str, documento: str, homolog: bool | None = None) -> dict:
 
 
 # ----------------------------------------------------------------- resumo tolerante
-_NEG_WORDS = re.compile(r"(nada\s*consta|n[aã]o\s*consta|sem\s*(registro|ocorr|protesto|pend|restri)|inexistente)",
+_NEG_WORDS = re.compile(r"(nada\s*consta|n[aã]o\s*consta|n[aã]o\s*(foram|foi)\s*encontrad|sem\s*(registro|ocorr|protesto|pend|restri)|inexistente)",
                         re.I)
-_POS_WORDS = re.compile(r"(consta[m]?\b(?!\s*nada)|possui|encontrad|registrad|pend[eê]ncia|protesto|restri|negativ)",
-                        re.I)
+_POS_WORDS = re.compile(r"(\bconsta[m]?\b|registrad)", re.I)
 _COUNT_KEYS = re.compile(r"(quantidade|qtd|total|numero|número|count|registros|ocorrencias|ocorrências)", re.I)
 _VALUE_KEYS = re.compile(r"(valor|value|montante|amount)", re.I)
 _SCORE_KEYS = re.compile(r"(score|pontuacao|pontuação)", re.I)
@@ -139,3 +138,92 @@ def resumir(resultado: dict) -> dict:
     if resultado.get("homolog"):
         partes.append("[homologação]")
     return {"consta": consta, "quantidade": quantidade, "valor": valor, "score": score, "texto": ", ".join(partes)}
+
+
+# ----------------------------------------------------------------- leitura estruturada
+CATEGORIAS = {
+    "protestos": "protesto(s)",
+    "negativacoes": "negativação(ões)",
+    "chequesSemFundo": "cheque(s) sem fundo",
+    "acoesJudiciais": "ação(ões) judicial(is)",
+    "recuperacoesJudiciaisFalencia": "recuperação judicial/falência",
+}
+
+
+def _find_key(obj, key):
+    if isinstance(obj, dict):
+        if key in obj:
+            return obj[key]
+        for v in obj.values():
+            r = _find_key(v, key)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = _find_key(v, key)
+            if r is not None:
+                return r
+    return None
+
+
+def _soma_valores(itens) -> float:
+    total = 0.0
+    for it in itens or []:
+        if isinstance(it, dict):
+            for k, v in it.items():
+                if re.search(r"valor", k, re.I):
+                    try:
+                        total += float(str(v).replace(".", "").replace(",", ".")) if isinstance(v, str) else float(v)
+                    except (TypeError, ValueError):
+                        pass
+                    break
+    return total
+
+
+def ler_pendencias(resultado: dict) -> dict:
+    """Leitura do retorno de pendências financeiras (detalhamento-negativo e similares).
+    Retorna {"consta", "quantidade", "valor", "detalhes": {categoria: n}, "texto", "estruturado"}."""
+    if not resultado.get("ok"):
+        return {"consta": None, "quantidade": None, "valor": None, "detalhes": {}, "estruturado": False,
+                "texto": f"indisponível ({resultado.get('error', 'erro')})"}
+    data = resultado.get("data") or {}
+    corpo = data.get("data") if isinstance(data, dict) and isinstance(data.get("data"), dict) else data
+    pf = _find_key(corpo, "pendenciaFinanceira")
+    detalhes, valor = {}, 0.0
+    fonte = pf if isinstance(pf, dict) else corpo
+    achou = False
+    for k in CATEGORIAS:
+        itens = fonte.get(k) if isinstance(fonte, dict) else None
+        if itens is None:
+            itens = _find_key(corpo, k)
+        if isinstance(itens, list):
+            achou = True
+            detalhes[k] = len(itens)
+            valor += _soma_valores(itens)
+    total = None
+    for k in ("totalPendencia", "totalPendencias"):
+        v = _find_key(corpo, k)
+        if isinstance(v, (int, float)):
+            total = int(v)
+            achou = True
+            break
+    possui = _find_key(corpo, "possuiPendencias")
+    if achou or isinstance(possui, bool):
+        qtd = sum(detalhes.values())
+        if total is not None:
+            qtd = max(qtd, total)
+        consta = qtd > 0 or possui is True
+        if consta:
+            partes = [f"{n} {CATEGORIAS[k]}" for k, n in detalhes.items() if n]
+            texto = ", ".join(partes) or f"{qtd} pendência(s)"
+            if valor:
+                texto += f", total ~ R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        else:
+            texto = "nada consta"
+        if resultado.get("homolog"):
+            texto += " [homologação]"
+        return {"consta": consta, "quantidade": qtd, "valor": valor or None, "detalhes": detalhes,
+                "estruturado": True, "texto": texto}
+    r = resumir(resultado)
+    r.update({"detalhes": {}, "estruturado": False})
+    return r

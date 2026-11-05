@@ -60,13 +60,11 @@ class Settings:
     APIBRASIL_TOKEN = _env("APIBRASIL_TOKEN", "")
     APIBRASIL_HOMOLOG = _env_bool("APIBRASIL_HOMOLOG", True)   # True = não gasta créditos
     APIBRASIL_ENABLED = _env_bool("APIBRASIL_ENABLED", False)
-    # tipos de consulta (campo "tipo" do body). Ajustáveis no .env conforme o catálogo contratado.
-    APIBRASIL_TIPO_PROTESTO_PJ = _env("APIBRASIL_TIPO_PROTESTO_PJ", "pessoa-juridica-protesto")
-    APIBRASIL_TIPO_NEGATIVACAO_PJ = _env("APIBRASIL_TIPO_NEGATIVACAO_PJ", "detalhamento-negativo")
-    APIBRASIL_TIPO_CERTIDAO_PJ = _env("APIBRASIL_TIPO_CERTIDAO_PJ", "certidao-conjunta-de-debitos-pessoa-juridica")
-    APIBRASIL_TIPO_PROTESTO_PF = _env("APIBRASIL_TIPO_PROTESTO_PF", "protesto-nacional-v2")
-    APIBRASIL_TIPO_NEGATIVACAO_PF = _env("APIBRASIL_TIPO_NEGATIVACAO_PF", "spc-serasa")
-    APIBRASIL_TIPO_DIVIDA_ATIVA_PF = _env("APIBRASIL_TIPO_DIVIDA_ATIVA_PF", "divida-ativa")
+    # Uma consulta por documento: "detalhamento-negativo" traz protestos, negativações, cheques sem fundo,
+    # ações judiciais e recuperação judicial/falência no mesmo retorno. Vazio = desligado.
+    APIBRASIL_TIPO_PJ = _env("APIBRASIL_TIPO_PJ", "detalhamento-negativo")
+    APIBRASIL_TIPO_PF = _env("APIBRASIL_TIPO_PF", "")  # sócios: desligado até escolher o produto PF
+    APIBRASIL_CUSTO_ESTIMADO = _env("APIBRASIL_CUSTO_ESTIMADO", "12,00")
 
     # --- Autentique ---
     AUTENTIQUE_URL = _env("AUTENTIQUE_URL", "https://api.autentique.com.br/v2/graphql")
